@@ -1,0 +1,111 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
+	import type { PageData } from './$types';
+	import { formatCents } from '$lib/format';
+
+	Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
+
+	let { data }: { data: PageData } = $props();
+
+	const gesamt = $derived(data.monate.reduce((s, m) => s + m.ausgaben, 0));
+	const gesamtAnzahl = $derived(data.monate.reduce((s, m) => s + m.anzahl, 0));
+
+	let chartCanvas: HTMLCanvasElement;
+
+	onMount(() => {
+		// Älteste zuerst für das Chart (chronologisch)
+		const chronologisch = [...data.monate].reverse();
+
+		const chart = new Chart(chartCanvas, {
+			type: 'bar',
+			data: {
+				labels: chronologisch.map((m) => m.label),
+				datasets: [{
+					label: 'Ausgaben',
+					data: chronologisch.map((m) => m.ausgaben / 100),
+					backgroundColor: '#3B82F6'
+				}]
+			},
+			options: {
+				responsive: true,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: (ctx) => formatCents((ctx.raw as number) * 100)
+						}
+					}
+				},
+				scales: {
+					y: {
+						ticks: {
+							callback: (v) => `${(v as number).toLocaleString('de-DE')} €`
+						}
+					}
+				}
+			}
+		});
+
+		return () => chart.destroy();
+	});
+</script>
+
+<div class="space-y-6">
+	<h1 class="text-2xl font-bold text-gray-900">Monatsverlauf</h1>
+
+	{#if data.monate.length === 0}
+		<div class="bg-white rounded-lg shadow-sm border px-4 py-8 text-center text-gray-400">
+			Noch keine Buchungen vorhanden.
+		</div>
+	{:else}
+		<!-- Chart -->
+		<div class="bg-white p-4 rounded-lg shadow-sm border">
+			<h3 class="text-sm font-medium text-gray-700 mb-3">Ausgaben pro Monat</h3>
+			<canvas bind:this={chartCanvas}></canvas>
+		</div>
+
+		<!-- Tabelle -->
+		<div class="bg-white rounded-lg shadow-sm border overflow-x-auto">
+			<table class="w-full">
+				<thead>
+					<tr class="border-b text-left text-sm text-gray-500">
+						<th class="px-4 py-3">Monat</th>
+						<th class="px-4 py-3 text-right">Buchungen</th>
+						<th class="px-4 py-3 text-right">Ausgaben</th>
+						<th class="px-4 py-3 text-right">Kumuliert</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.monate as m (m.monat)}
+						<tr class="border-b last:border-b-0 hover:bg-gray-50">
+							<td class="px-4 py-3 text-sm">
+								<a href="/buchungen?monat={m.monat}" class="font-medium text-blue-600 hover:underline">
+									{m.label}
+								</a>
+								<div class="text-xs text-gray-400 mt-0.5">
+									{#if m.material > 0}<span>Material {formatCents(m.material)}</span>{/if}
+									{#if m.material > 0 && (m.arbeitslohn > 0 || m.sonstiges > 0)}<span class="mx-1">·</span>{/if}
+									{#if m.arbeitslohn > 0}<span>Arbeitslohn {formatCents(m.arbeitslohn)}</span>{/if}
+									{#if m.arbeitslohn > 0 && m.sonstiges > 0}<span class="mx-1">·</span>{/if}
+									{#if m.sonstiges > 0}<span>Sonstiges {formatCents(m.sonstiges)}</span>{/if}
+								</div>
+							</td>
+							<td class="px-4 py-3 text-sm text-right text-gray-500">{m.anzahl}</td>
+							<td class="px-4 py-3 text-sm text-right font-mono">{formatCents(m.ausgaben)}</td>
+							<td class="px-4 py-3 text-sm text-right font-mono text-gray-500">{formatCents(m.kumuliert)}</td>
+						</tr>
+					{/each}
+				</tbody>
+				<tfoot>
+					<tr class="border-t bg-gray-50 font-medium">
+						<td class="px-4 py-3 text-sm">Gesamt</td>
+						<td class="px-4 py-3 text-sm text-right text-gray-500">{gesamtAnzahl}</td>
+						<td class="px-4 py-3 text-sm text-right font-mono">{formatCents(gesamt)}</td>
+						<td class="px-4 py-3"></td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+	{/if}
+</div>

@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+
+@layer components {
+  /* Buttons */
+  .btn-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors duration-150;
+  }
+  .btn-secondary {
+    @apply px-4 py-2 rounded text-sm text-gray-600 hover:bg-gray-100 transition-colors duration-150;
+  }
+  .btn-sm-primary {
+    @apply bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 transition-colors duration-150;
+  }
+  .btn-sm-secondary {
+    @apply text-gray-500 px-3 py-2 rounded text-sm hover:bg-gray-100 transition-colors duration-150;
+  }
+
+  /* Inputs */
+  .input-base {
+    @apply w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  }
+  .input-sm {
+    @apply border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  }
+
+  /* KPI card base */
+  .kpi-card {
+    @apply bg-white p-4 rounded-lg shadow-sm border;
+  }
+}

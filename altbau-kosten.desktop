@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Altbau Kosten
+Exec=/home/nils/Altbau/start.sh
+Icon=accessories-calculator
+Terminal=false
+Type=Application
+Categories=Office;

@@ -1,0 +1,86 @@
+<script lang="ts">
+	import type { PageData } from './$types';
+	import { goto } from '$app/navigation';
+	import { formatCents, formatDatum } from '$lib/format';
+
+	let { data }: { data: PageData } = $props();
+
+	function isPdf(name: string): boolean {
+		return name.toLowerCase().endsWith('.pdf');
+	}
+
+	function applyFilter(key: string, value: string) {
+		const params = new URLSearchParams(window.location.search);
+		if (value) params.set(key, value);
+		else params.delete(key);
+		goto(`/belege?${params.toString()}`);
+	}
+
+	const totalBelege = $derived(data.eintraege.reduce((s, e) => s + e.belege.length, 0));
+</script>
+
+<div class="space-y-6">
+	<h1 class="text-2xl font-bold text-gray-900">Belege</h1>
+
+	<!-- Filter -->
+	<div class="flex gap-3 bg-white p-3 rounded-lg shadow-sm border">
+		<select onchange={(e) => applyFilter('gewerk', e.currentTarget.value)}
+			class="border border-gray-300 rounded px-3 py-1.5 text-sm">
+			<option value="">Alle Gewerke</option>
+			{#each data.gewerke as g}
+				<option value={g.id} selected={data.filter.gewerk === g.id}>{g.name}</option>
+			{/each}
+		</select>
+	</div>
+
+	<!-- Karten -->
+	{#if data.eintraege.length === 0}
+		<div class="bg-white rounded-lg shadow-sm border px-4 py-12 text-center text-gray-400">
+			Keine Belege vorhanden
+		</div>
+	{:else}
+		<div class="space-y-4">
+			{#each data.eintraege as eintrag (eintrag.buchungId)}
+				<div class="bg-white rounded-lg shadow-sm border p-4">
+					<!-- Buchungs-Info -->
+					<div class="flex items-start justify-between mb-3">
+						<div>
+							<div class="font-medium text-gray-900">{eintrag.beschreibung}</div>
+							<div class="text-sm text-gray-500 mt-0.5">
+								{formatDatum(eintrag.datum)} &middot; {eintrag.gewerkName} &middot; {formatCents(eintrag.betrag)}
+							</div>
+						</div>
+						<a href="/buchungen/{eintrag.buchungId}" class="text-blue-600 hover:underline text-sm shrink-0 ml-4">
+							Bearbeiten
+						</a>
+					</div>
+
+					<!-- Belege -->
+					<div class="flex flex-wrap gap-2">
+						{#each eintrag.belege as beleg}
+							<a href="/belege/{eintrag.buchungId}/{beleg}" target="_blank"
+								class="flex items-center gap-1.5 bg-gray-50 border rounded px-3 py-1.5 text-sm hover:bg-gray-100 transition-colors">
+								{#if isPdf(beleg)}
+									<svg class="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+										<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+									</svg>
+								{:else}
+									<svg class="w-4 h-4 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+										<path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+									</svg>
+								{/if}
+								<span class="text-blue-600 hover:underline">{beleg}</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if data.eintraege.length > 0}
+		<div class="text-sm text-gray-500 text-right">
+			{data.eintraege.length} Buchungen mit {totalBelege} Belegen
+		</div>
+	{/if}
+</div>
