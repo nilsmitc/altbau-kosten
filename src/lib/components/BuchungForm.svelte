@@ -15,6 +15,7 @@
 			beschreibung?: string;
 			rechnungsreferenz?: string;
 		};
+		defaultGewerk?: string | null;
 		belege?: string[];
 		buchungId?: string;
 		error?: string;
@@ -22,7 +23,10 @@
 		action?: string;
 	}
 
-	let { gewerke, raeume, values = {}, belege = [], buchungId, error = '', submitLabel = 'Speichern', action }: Props = $props();
+	let { gewerke, raeume, values = {}, defaultGewerk = null, belege = [], buchungId, error = '', submitLabel = 'Speichern', action }: Props = $props();
+
+	const geschosse = $derived([...new Set(raeume.map((r) => r.geschoss))].sort());
+	const isRueckbuchung = $derived((values.betrag ?? 0) < 0);
 
 	const today = new Date().toISOString().slice(0, 10);
 
@@ -47,9 +51,14 @@
 		<div>
 			<label for="betrag" class="block text-sm font-medium text-gray-700 mb-1">Betrag (EUR)</label>
 			<input type="text" name="betrag" id="betrag" required inputmode="decimal"
-				value={values.betrag ? centsToInputValue(values.betrag) : ''}
+				value={values.betrag ? centsToInputValue(Math.abs(values.betrag)) : ''}
 				placeholder="z.B. 234,50"
 				class="input-base" />
+			<div class="flex items-center gap-2 mt-1">
+				<input type="checkbox" name="rueckbuchung" id="rueckbuchung"
+					checked={isRueckbuchung} class="rounded" />
+				<label for="rueckbuchung" class="text-sm text-gray-700">Rückbuchung / Gutschrift</label>
+			</div>
 		</div>
 
 		<div>
@@ -57,17 +66,26 @@
 			<select name="gewerk" id="gewerk" required class="input-base">
 				<option value="">— Bitte wählen —</option>
 				{#each gewerke as g}
-					<option value={g.id} selected={values.gewerk === g.id}>{g.name}</option>
+					<option value={g.id} selected={(values.gewerk ?? defaultGewerk) === g.id}>{g.name}</option>
 				{/each}
 			</select>
 		</div>
 
 		<div>
-			<label for="raum" class="block text-sm font-medium text-gray-700 mb-1">Raum <span class="text-gray-400">(optional)</span></label>
+			<label for="raum" class="block text-sm font-medium text-gray-700 mb-1">Ort <span class="text-gray-400">(optional)</span></label>
 			<select name="raum" id="raum" class="input-base">
-				<option value="">— Kein Raum —</option>
-				{#each raeume as r}
-					<option value={r.id} selected={values.raum === r.id}>{r.name} ({r.geschoss})</option>
+				<option value="">— Kein Ort —</option>
+				<optgroup label="Stockwerk">
+					{#each geschosse as g}
+						<option value="@{g}" selected={values.raum === `@${g}`}>{g} (ganzes Stockwerk)</option>
+					{/each}
+				</optgroup>
+				{#each geschosse as g}
+					<optgroup label="Einzelräume – {g}">
+						{#each raeume.filter((r) => r.geschoss === g).sort((a, b) => a.sortierung - b.sortierung) as r}
+							<option value={r.id} selected={values.raum === r.id}>{r.name}</option>
+						{/each}
+					</optgroup>
 				{/each}
 			</select>
 		</div>

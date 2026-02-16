@@ -11,6 +11,7 @@
 		gewerke={data.gewerke}
 		raeume={data.raeume}
 		values={form?.values}
+		defaultGewerk={data.lastGewerk}
 		error={form?.error}
 		submitLabel="Buchung anlegen"
 	/>

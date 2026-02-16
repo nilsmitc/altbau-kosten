@@ -60,6 +60,9 @@ export const actions: Actions = {
 		const projekt = leseProjekt();
 		projekt.gewerke = projekt.gewerke.filter((g) => g.id !== id);
 		projekt.budgets = projekt.budgets.filter((b) => b.gewerk !== id);
+		projekt.planung = projekt.planung
+			.filter((p) => p.gewerk !== id)
+			.map((p) => ({ ...p, nachGewerk: p.nachGewerk.filter((g) => g !== id) }));
 		schreibeProjekt(projekt);
 		return { success: true };
 	}

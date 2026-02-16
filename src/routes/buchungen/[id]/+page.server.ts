@@ -23,7 +23,9 @@ export const actions: Actions = {
 	update: async ({ request, params }) => {
 		const form = await request.formData();
 
-		const betrag = parseCentsFromInput(form.get('betrag') as string);
+		const isRueckbuchung = form.get('rueckbuchung') === 'on';
+		const betragRaw = parseCentsFromInput(form.get('betrag') as string);
+		const betrag = isRueckbuchung ? -Math.abs(betragRaw) : Math.abs(betragRaw);
 		const data = {
 			datum: form.get('datum') as string,
 			betrag,

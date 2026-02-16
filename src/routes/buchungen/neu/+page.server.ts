@@ -6,10 +6,13 @@ import { fail, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = () => {
 	const projekt = leseProjekt();
+	const buchungen = leseBuchungen();
+	const lastGewerk = buchungen.at(-1)?.gewerk ?? null;
 	return {
 		gewerke: projekt.gewerke,
 		raeume: projekt.raeume,
-		kategorien: KATEGORIEN
+		kategorien: KATEGORIEN,
+		lastGewerk
 	};
 };
 
@@ -17,7 +20,9 @@ export const actions: Actions = {
 	default: async ({ request }) => {
 		const form = await request.formData();
 
-		const betrag = parseCentsFromInput(form.get('betrag') as string);
+		const isRueckbuchung = form.get('rueckbuchung') === 'on';
+		const betragRaw = parseCentsFromInput(form.get('betrag') as string);
+		const betrag = isRueckbuchung ? -Math.abs(betragRaw) : Math.abs(betragRaw);
 		const data = {
 			datum: form.get('datum') as string,
 			betrag,

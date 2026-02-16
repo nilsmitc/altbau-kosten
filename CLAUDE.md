@@ -61,6 +61,15 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
   ],
   "budgets": [
     { "gewerk": "elektro", "geplant": 800000, "notiz": "" }
+  ],
+  "planung": [
+    {
+      "gewerk": "elektro",
+      "start": "2026-03-01",
+      "ende": "2026-03-15",
+      "status": "geplant",
+      "nachGewerk": ["trockenbau"]
+    }
   ]
 }
 ```
@@ -69,6 +78,9 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 - `sortierung`: Reihenfolge in Listen (0-basiert)
 - `budgets[].gewerk`: Referenz auf `gewerke[].id`
 - Jedes Gewerk hat genau einen Budget-Eintrag
+- `planung[]`: optional, ein Eintrag pro Gewerk; `start`/`ende` leer wenn nicht terminiert
+- `planung[].status`: `"geplant"` | `"aktiv"` | `"fertig"`
+- `planung[].nachGewerk`: Gewerk-IDs die nach diesem starten können (Abhängigkeiten)
 
 ### buchungen.json
 ```json
@@ -89,7 +101,11 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 ]
 ```
 
-- `raum`: **nullable** — `null` bei raumunabhängigen Kosten (Gerüst, Baustellenstrom, etc.)
+- `betrag`: Integer in Cents. **Negativ bei Rückbuchungen** (`-5000` = −50,00 € Gutschrift)
+- `raum`: drei mögliche Werte:
+  - `null` — kein Ort (allgemeine Kosten)
+  - `"bad-eg"` etc. — Einzelraum-ID
+  - `"@EG"` / `"@OG"` / `"@KG"` — Stockwerk-Buchung (Präfix `@`, Geschoss wird aus Räumen abgeleitet)
 - `rechnungsreferenz`: optional, leerer String wenn nicht vorhanden
 - `belege`: Array von Dateinamen, z.B. `["rechnung.pdf"]`. Leeres Array `[]` wenn keine Belege. Dateien liegen in `data/belege/{buchung-id}/`
 - `datum`: ISO-Datumsstring `YYYY-MM-DD`
@@ -260,7 +276,10 @@ Altbau/
 │       ├── belege/[buchungId]/[dateiname]/+server.ts  # Beleg-Dateien ausliefern
 │       ├── gewerke/+page.svelte     # Gewerke CRUD
 │       ├── raeume/+page.svelte      # Räume CRUD (nach Geschoss gruppiert)
-│       └── budget/+page.svelte      # Budget-Tabelle mit Ampel + Inline-Edit + Notizen
+│       ├── budget/+page.svelte      # Budget-Tabelle mit Ampel + Inline-Edit + Notizen
+│       ├── planung/+page.svelte     # Bauplaner (Gantt-Chart, Abhängigkeiten, Status)
+│       ├── einstellungen/+page.svelte  # Export / Import (ZIP-Backup)
+│       └── api/export/+server.ts    # GET-Endpoint: ZIP-Download aller Daten
 ├── start.sh                         # Dev-Server starten + Browser öffnen
 ├── altbau-kosten.desktop            # Desktop-Shortcut
 ├── CLAUDE.md                        # Diese Datei
@@ -281,41 +300,8 @@ Altbau/
 Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fähig:
 - `/buchungen?gewerk=elektro&raum=bad-eg&kategorie=Material&suche=Rechnung`
 - `/buchungen?monat=2026-02` (vom Monatsverlauf-Link)
-
----
-
-## Aktuelle Gewerke
-
-| ID | Name | Budget | Hinweis |
-|----|------|--------|---------|
-| `allgemein` | Allgemein | — | Sammel-Gewerk für nicht zuordbare Kosten |
-| `rohbau` | Rohbau | 20.000 € | |
-| `elektro` | Elektro | 8.000 € | |
-| `sanitaer` | Sanitär | 12.000 € | |
-| `heizung` | Heizung | 15.000 € | |
-| `trockenbau` | Trockenbau | 6.000 € | |
-| `maler` | Maler | 4.000 € | |
-| `boden` | Boden | 5.000 € | |
-| `fenster-tueren` | Fenster & Türen | 10.000 € | |
-| `dach` | Dach | 15.000 € | |
-| `sonstiges` | Sonstiges | 3.000 € | |
-| `schweizer-taschenmesser-jungs` | Schweizer Taschenmesser Jungs | — | |
-
-**Hinweis:** `allgemein` ist das Sammel-Gewerk für Materialkosten die sich nicht einem einzelnen Gewerk zuordnen lassen (z.B. Bauhaus-Sammelbestellungen, allgemeines Verbrauchsmaterial).
-
-## Aktuelle Räume
-
-| ID | Name | Geschoss |
-|----|------|----------|
-| `kueche-eg` | Küche | EG |
-| `wohnzimmer-eg` | Wohnzimmer | EG |
-| `bad-eg` | Bad | EG |
-| `flur-eg` | Flur | EG |
-| `schlafzimmer-og` | Schlafzimmer | OG |
-| `bad-og` | Bad | OG |
-| `kinderzimmer-og` | Kinderzimmer | OG |
-| `flur-og` | Flur | OG |
-| `tonstudio-kg` | Tonstudio | KG |
+- `/buchungen?raum=@EG` — nur Stockwerk-Buchungen EG
+- `/buchungen?geschoss=EG` — alle EG-Buchungen (Einzelräume + `@EG` kombiniert)
 
 ---
 
@@ -350,7 +336,7 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 
 ---
 
-## Features (Stand 15.02.2026)
+## Features (Stand 16.02.2026)
 
 ### Dashboard (`/`)
 - 5 KPI-Karten: Budget, Ausgaben, Verbleibend, Verbraucht%, Top-Raum (klickbar)
@@ -361,10 +347,12 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 
 ### Buchungen (`/buchungen`)
 - Volltext-Suche in Beschreibung + Rechnungsreferenz
-- Filter: Gewerk, Raum, Kategorie (kombinierbar)
-- Alle Filter als URL-Parameter → shareable, browser-back-fähig
+- Filter: Gewerk, Raum, Kategorie, Geschoss (kombinierbar, URL-Parameter)
 - CRUD: Erstellen, Bearbeiten, Löschen
+- **Rückbuchungen**: Checkbox im Formular → negativer `betrag`, rot markiert in Liste
+- **Flexible Ortzuordnung**: Einzelraum, Stockwerk (`@EG`) oder kein Ort
 - Belege anhängen (PDF/JPG/PNG, max 10 MB)
+- Sortierung: neueste Buchungen oben; letztes Gewerk wird vorausgefüllt
 
 ### Monatsverlauf (`/verlauf`)
 - Bar-Chart (Chart.js) – Ausgaben pro Monat chronologisch
@@ -374,13 +362,23 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 ### Budget (`/budget`)
 - Übersicht: Budget vs. Ist pro Gewerk mit Ampel-Farben
 - Inline-Edit: Budget-Betrag + Notiz pro Gewerk
-- Notizen werden in der Tabelle angezeigt
 
 ### Belege (`/belege`)
 - Übersicht aller hochgeladenen Dokumente
 - Filter nach Gewerk
 - Direkter Download/Anzeige
 
+### Bauplaner (`/planung`)
+- CSS-only Gantt-Chart (kein zusätzliches Package)
+- Status pro Gewerk: `geplant` / `aktiv` / `fertig`
+- Abhängigkeiten: „Danach kommt" per Checkbox
+- „Als nächstes bereit"-Panel: Gewerke ohne unfertige Vorgänger
+- ⚠-Warnung wenn Startdatum vor Ende eines Vorgängers
+
 ### Gewerke & Räume (`/gewerke`, `/raeume`)
 - CRUD für Stammdaten
-- Räume gruppiert nach Geschoss (EG/OG/KG)
+- Räume gruppiert nach Geschoss
+
+### Einstellungen (`/einstellungen`)
+- **Export**: ZIP-Download mit projekt.json + buchungen.json + alle Belege
+- **Import**: ZIP hochladen → vollständiges Restore (ersetzt alle Daten)

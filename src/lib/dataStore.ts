@@ -21,7 +21,8 @@ function summaryPath(): string {
 
 export function leseProjekt(): ProjektData {
 	try {
-		return JSON.parse(readFileSync(projektPath(), 'utf-8'));
+		const parsed = JSON.parse(readFileSync(projektPath(), 'utf-8'));
+		return { planung: [], ...parsed };
 	} catch {
 		throw new Error(`projekt.json konnte nicht gelesen werden – Datei fehlt oder ist beschädigt`);
 	}

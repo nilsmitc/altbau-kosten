@@ -12,8 +12,13 @@
 
 	function raumName(id: string | null): string {
 		if (!id) return '—';
+		if (id.startsWith('@')) return `${id.slice(1)} (Stockwerk)`;
 		const r = data.raeume.find((r) => r.id === id);
 		return r ? `${r.name} (${r.geschoss})` : id;
+	}
+
+	function gewerkFarbe(id: string): string {
+		return data.gewerke.find((g) => g.id === id)?.farbe ?? '#9ca3af';
 	}
 
 	function applyFilter(key: string, value: string) {
@@ -96,10 +101,20 @@
 								<div class="text-xs text-gray-400">{buchung.rechnungsreferenz}</div>
 							{/if}
 						</td>
-						<td class="px-4 py-3 text-sm">{gewerkName(buchung.gewerk)}</td>
+						<td class="px-4 py-3 text-sm">
+							<div class="flex items-center gap-1.5">
+								<div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {gewerkFarbe(buchung.gewerk)}"></div>
+								{gewerkName(buchung.gewerk)}
+							</div>
+						</td>
 						<td class="px-4 py-3 text-sm">{raumName(buchung.raum)}</td>
 						<td class="px-4 py-3 text-sm">{buchung.kategorie}</td>
-						<td class="px-4 py-3 text-sm text-right font-mono">{formatCents(buchung.betrag)}</td>
+						<td class="px-4 py-3 text-sm text-right font-mono {buchung.betrag < 0 ? 'text-red-600' : ''}">
+							{formatCents(buchung.betrag)}
+							{#if buchung.betrag < 0}
+								<span class="ml-1 text-xs bg-red-100 text-red-700 px-1 rounded">Rückbuchung</span>
+							{/if}
+						</td>
 						<td class="px-4 py-3 text-sm text-right">
 							<a href="/buchungen/{buchung.id}" class="text-blue-600 hover:underline">Bearbeiten</a>
 						</td>

@@ -1,21 +1,25 @@
 # Altbau Kostenverfolgung
 
-Web-App zur Kostenverfolgung von Altbau-Renovierungsprojekten. Lokale SvelteKit-Anwendung mit dateibasierter JSON-Speicherung – kein Server, keine Datenbank nötig.
+Web-App zur Kostenverfolgung von Renovierungsprojekten. Lokale SvelteKit-Anwendung mit dateibasierter JSON-Speicherung – kein Server, keine Datenbank nötig.
 
 ## Features
 
 - **Dashboard** – KPI-Karten (Budget, Ausgaben, Verbleibend), Charts, Budget-Warnungen
-- **Buchungen** – Kostenbuchungen erfassen, bearbeiten, löschen; Volltext-Suche + kombinierbare Filter
+- **Buchungen** – Kostenbuchungen erfassen, bearbeiten, löschen; Volltext-Suche + kombinierbare Filter; **Rückbuchungen** (negative Beträge für Retouren/Gutschriften)
+- **Flexible Ortzuordnung** – Buchungen auf einzelne Räume oder ganze Stockwerke buchen
 - **Belege** – Dokumente (PDF/JPG/PNG) pro Buchung hochladen und verwalten
 - **Monatsverlauf** – Ausgaben-Trend mit Kategorie-Aufschlüsselung (Material / Arbeitslohn / Sonstiges)
 - **Budget** – Gewerk-Budgets mit Ampel-Status und Inline-Bearbeitung
+- **Bauplaner** – Zeitplan pro Gewerk (Gantt-Chart), Abhängigkeiten, Status-Tracking
 - **Gewerke & Räume** – Stammdaten verwalten (CRUD), Räume nach Geschoss gruppiert
+- **Export / Import** – Vollständiges ZIP-Backup aller Daten inkl. Belege; Restore per Import
 
 ## Tech Stack
 
 - [SvelteKit](https://kit.svelte.dev/) + [Svelte 5](https://svelte.dev/) (TypeScript)
 - [Tailwind CSS v4](https://tailwindcss.com/)
 - [Chart.js](https://www.chartjs.org/) – Doughnut- und Balkendiagramme
+- [fflate](https://github.com/101arrowz/fflate) – ZIP-Kompression für Export/Import
 - JSON-Dateien als Datenspeicher (kein externes DB)
 
 ## Voraussetzungen
@@ -34,7 +38,7 @@ Datendateien anlegen:
 
 ```bash
 mkdir -p data/belege
-echo '{"gewerke":[],"raeume":[],"budgets":[]}' > data/projekt.json
+echo '{"gewerke":[],"raeume":[],"budgets":[],"planung":[]}' > data/projekt.json
 echo '[]' > data/buchungen.json
 echo '{"generiert":null,"gesamt":{"ist":0,"budget":0},"gewerke":[],"raeume":[],"letzteBuchungen":[]}' > data/summary.json
 ```
@@ -55,12 +59,23 @@ Alle Daten liegen in `data/` (nicht im Repository):
 
 | Datei | Inhalt |
 |-------|--------|
-| `projekt.json` | Gewerke, Räume, Budgets |
+| `projekt.json` | Gewerke, Räume, Budgets, Bauplaner-Einträge |
 | `buchungen.json` | Alle Kostenbuchungen |
 | `summary.json` | Auto-generierte Zusammenfassung |
-| `belege/` | Hochgeladene Dokumente (ein Ordner pro Buchung) |
+| `belege/` | Hochgeladene Dokumente (ein Ordner pro Buchung-UUID) |
 
 Geldbeträge werden als **Integer in Cent** gespeichert (`300000` = 3.000,00 €).
+Rückbuchungen werden als **negativer Betrag** gespeichert (`-5000` = −50,00 €).
+
+### Ortzuordnung
+
+Das `raum`-Feld in Buchungen unterstützt drei Werte:
+
+| Wert | Bedeutung |
+|------|-----------|
+| `null` | Kein Ort (allgemeine Kosten) |
+| `"bad-eg"` | Einzelraum (Raum-ID) |
+| `"@EG"` | Stockwerk-Buchung (Präfix `@`) |
 
 ## Projektstruktur
 
@@ -80,7 +95,10 @@ src/
     ├── belege/               # Dokumentenverwaltung
     ├── budget/               # Budget-Übersicht
     ├── gewerke/              # Gewerke-Verwaltung
-    └── raeume/               # Räume-Verwaltung
+    ├── raeume/               # Räume-Verwaltung
+    ├── planung/              # Bauplaner (Gantt, Abhängigkeiten)
+    ├── einstellungen/        # Export / Import
+    └── api/export/           # ZIP-Download-Endpoint
 ```
 
 ## NPM Scripts

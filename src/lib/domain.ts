@@ -38,10 +38,21 @@ export interface Budget {
 	notiz: string;
 }
 
+export type PlanungStatus = 'geplant' | 'aktiv' | 'fertig';
+
+export interface PlanungEintrag {
+	gewerk: string;       // Gewerk-ID
+	start: string;        // YYYY-MM-DD, leer wenn nicht terminiert
+	ende: string;         // YYYY-MM-DD, leer wenn nicht terminiert
+	status: PlanungStatus;
+	nachGewerk: string[]; // Gewerk-IDs die direkt nach diesem kommen
+}
+
 export interface ProjektData {
 	gewerke: Gewerk[];
 	raeume: Raum[];
 	budgets: Budget[];
+	planung: PlanungEintrag[];
 }
 
 // === Aggregated Views ===
@@ -102,7 +113,7 @@ export function validateBuchung(
 ): string[] {
 	const errors: string[] = [];
 	if (!data.datum) errors.push('Datum ist erforderlich');
-	if (!data.betrag || data.betrag <= 0) errors.push('Betrag muss größer als 0 sein');
+	if (!data.betrag) errors.push('Betrag muss ungleich 0 sein');
 	if (!data.gewerk) errors.push('Gewerk ist erforderlich');
 	if (data.gewerk && !gewerke.find((g) => g.id === data.gewerk))
 		errors.push('Unbekanntes Gewerk');
@@ -146,7 +157,8 @@ export function berechneRaumSummaries(
 	buchungen: Buchung[],
 	raeume: Raum[]
 ): RaumSummary[] {
-	return raeume
+	// Einzelraum-Summaries
+	const raumSummaries = raeume
 		.sort((a, b) => a.sortierung - b.sortierung)
 		.map((raum) => {
 			const rb = buchungen.filter((b) => b.raum === raum.id);
@@ -160,6 +172,23 @@ export function berechneRaumSummaries(
 				nachGewerk
 			};
 		});
+
+	// Stockwerk-Summaries (@EG, @OG, ...)
+	const geschosse = [...new Set(raeume.map((r) => r.geschoss))].sort();
+	const geschossSummaries: RaumSummary[] = geschosse
+		.map((g) => {
+			const rb = buchungen.filter((b) => b.raum === `@${g}`);
+			if (rb.length === 0) return null;
+			const nachGewerk: Record<string, number> = {};
+			for (const b of rb) {
+				nachGewerk[b.gewerk] = (nachGewerk[b.gewerk] ?? 0) + b.betrag;
+			}
+			const virtualRaum: Raum = { id: `@${g}`, name: `${g} (Stockwerk)`, geschoss: g, sortierung: -1 };
+			return { raum: virtualRaum, ist: rb.reduce((s, b) => s + b.betrag, 0), nachGewerk };
+		})
+		.filter((s): s is RaumSummary => s !== null);
+
+	return [...geschossSummaries, ...raumSummaries];
 }
 
 export function berechneDashboard(
@@ -180,6 +209,25 @@ export function berechneDashboard(
 		raumSummaries,
 		letzteBuchungen: [...buchungen].sort((a, b) => b.erstellt.localeCompare(a.erstellt)).slice(0, 10)
 	};
+}
+
+// === Planungs-Helpers ===
+
+export function vorgaengerVon(gewerkId: string, planung: PlanungEintrag[]): string[] {
+	return planung.filter((p) => p.nachGewerk.includes(gewerkId)).map((p) => p.gewerk);
+}
+
+// === Ort-Helpers ===
+
+export function isGeschossBuchung(raum: string | null): boolean {
+	return raum !== null && raum.startsWith('@');
+}
+
+export function raumLabel(raum: string | null, raeume: Raum[]): string {
+	if (!raum) return '—';
+	if (isGeschossBuchung(raum)) return `${raum.slice(1)} (Stockwerk)`;
+	const r = raeume.find((r) => r.id === raum);
+	return r ? `${r.name} (${r.geschoss})` : raum;
 }
 
 // === Helpers ===
