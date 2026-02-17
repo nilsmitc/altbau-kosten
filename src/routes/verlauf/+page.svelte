@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
+	import { Chart, BarController, BarElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 	import type { PageData } from './$types';
 	import { formatCents } from '$lib/format';
 
-	Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
+	Chart.register(BarController, BarElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip);
 
 	let { data }: { data: PageData } = $props();
 
@@ -12,6 +12,7 @@
 	const gesamtAnzahl = $derived(data.monate.reduce((s, m) => s + m.anzahl, 0));
 
 	let chartCanvas: HTMLCanvasElement;
+	let kumulativCanvas: HTMLCanvasElement;
 
 	onMount(() => {
 		// Älteste zuerst für das Chart (chronologisch)
@@ -47,7 +48,44 @@
 			}
 		});
 
-		return () => chart.destroy();
+		const kumulativChart = new Chart(kumulativCanvas, {
+			type: 'line',
+			data: {
+				labels: chronologisch.map((m) => m.label),
+				datasets: [{
+					label: 'Kumuliert',
+					data: chronologisch.map((m) => m.kumuliert / 100),
+					borderColor: '#10B981',
+					backgroundColor: '#10B981',
+					tension: 0.3,
+					fill: false,
+					pointRadius: 4
+				}]
+			},
+			options: {
+				responsive: true,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: (ctx) => formatCents((ctx.raw as number) * 100)
+						}
+					}
+				},
+				scales: {
+					y: {
+						ticks: {
+							callback: (v) => `${(v as number).toLocaleString('de-DE')} €`
+						}
+					}
+				}
+			}
+		});
+
+		return () => {
+			chart.destroy();
+			kumulativChart.destroy();
+		};
 	});
 </script>
 
@@ -63,6 +101,12 @@
 		<div class="bg-white p-4 rounded-lg shadow-sm border">
 			<h3 class="text-sm font-medium text-gray-700 mb-3">Ausgaben pro Monat</h3>
 			<canvas bind:this={chartCanvas}></canvas>
+		</div>
+
+		<!-- Kumulativer Verlauf -->
+		<div class="bg-white p-4 rounded-lg shadow-sm border">
+			<h3 class="text-sm font-medium text-gray-700 mb-3">Kumulierte Gesamtausgaben</h3>
+			<canvas bind:this={kumulativCanvas}></canvas>
 		</div>
 
 		<!-- Tabelle -->

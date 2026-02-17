@@ -9,13 +9,18 @@
 	const prozent = $derived(data.gesamtBudget > 0 ? Math.round((data.gesamtIst / data.gesamtBudget) * 100) : 0);
 	const topRaum = $derived([...data.raumSummaries].sort((a, b) => b.ist - a.ist)[0] ?? null);
 	const warnungen = $derived(data.gewerkSummaries.filter((s) => s.budget > 0 && s.ist / s.budget >= 0.8));
+	const restMonate = $derived(
+		data.avgProMonat > 0 && verbleibend > 0
+			? Math.round(verbleibend / data.avgProMonat)
+			: null
+	);
 </script>
 
 <div class="space-y-6">
 	<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
 
 	<!-- KPIs -->
-	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
 		<div class="kpi-card border-l-4 border-l-blue-500">
 			<div class="text-sm text-gray-500">Gesamtbudget</div>
 			<div class="text-xl font-bold font-mono">{formatCents(data.gesamtBudget)}</div>
@@ -44,6 +49,15 @@
 				<div class="text-xl font-bold font-mono">{formatCents(topRaum.ist)}</div>
 				<div class="text-xs text-gray-400 mt-0.5">{topRaum.raum.name} ({topRaum.raum.geschoss})</div>
 			</a>
+		{/if}
+		{#if data.anzahlMonate > 0}
+			<div class="kpi-card border-l-4 border-l-teal-500">
+				<div class="text-sm text-gray-500">Burn Rate</div>
+				<div class="text-xl font-bold font-mono">{formatCents(data.avgProMonat)}<span class="text-sm font-normal text-gray-400"> / Mo.</span></div>
+				{#if restMonate !== null && data.gesamtBudget > 0}
+					<div class="text-xs text-gray-400 mt-0.5">~{restMonate} Monate Budget</div>
+				{/if}
+			</div>
 		{/if}
 	</div>
 
@@ -97,7 +111,7 @@
 			<div class="divide-y">
 				{#each data.gewerkSummaries.filter((s) => s.ist > 0) as s (s.gewerk.id)}
 					{@const pct = s.budget > 0 ? Math.round((s.ist / s.budget) * 100) : 0}
-					<div class="px-4 py-3">
+					<a href="/buchungen?gewerk={s.gewerk.id}" class="block px-4 py-3 hover:bg-gray-50 transition-colors">
 						<div class="flex items-center justify-between mb-1">
 							<div class="flex items-center gap-2 text-sm">
 								<div class="w-3 h-3 rounded-full" style="background-color: {s.gewerk.farbe}"></div>
@@ -113,7 +127,7 @@
 								></div>
 							</div>
 						{/if}
-					</div>
+					</a>
 				{/each}
 			</div>
 		</div>
