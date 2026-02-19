@@ -55,28 +55,40 @@
 					<tr class="border-b last:border-b-0 hover:bg-gray-50/50 transition-colors">
 						{#if editId === gewerk.id}
 							<td colspan="3" class="px-4 py-3">
-								<form method="POST" action="?/update" use:enhance={() => { return async ({ update }) => { editId = null; update(); }; }} class="flex gap-3 items-end">
+								<form method="POST" action="?/update" use:enhance={() => { return async ({ update }) => { editId = null; update(); }; }} class="space-y-2">
 									<input type="hidden" name="id" value={gewerk.id} />
-									<div class="flex-1">
-										<input type="text" name="name" value={gewerk.name} required
-											class="input-base" />
+									<div class="flex gap-3 items-end">
+										<div class="flex-1">
+											<input type="text" name="name" value={gewerk.name} required
+												class="input-base" />
+										</div>
+										<input type="color" name="farbe" value={gewerk.farbe} class="h-10 w-14 rounded-md border border-gray-300 cursor-pointer" />
+										<button type="submit" class="btn-sm-primary inline-flex items-center gap-1.5">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 12.75l6 6 9-13.5" /></svg>
+											Speichern
+										</button>
+										<button type="button" onclick={() => editId = null} class="btn-sm-secondary inline-flex items-center gap-1.5">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+											Abbrechen
+										</button>
 									</div>
-									<input type="color" name="farbe" value={gewerk.farbe} class="h-10 w-14 rounded-md border border-gray-300 cursor-pointer" />
-									<button type="submit" class="btn-sm-primary inline-flex items-center gap-1.5">
-										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 12.75l6 6 9-13.5" /></svg>
-										Speichern
-									</button>
-									<button type="button" onclick={() => editId = null} class="btn-sm-secondary inline-flex items-center gap-1.5">
-										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-										Abbrechen
-									</button>
+									<label class="flex items-center gap-2 cursor-pointer text-sm text-gray-600 ml-0.5">
+										<input type="checkbox" name="pauschal" checked={gewerk.pauschal ?? false} class="rounded" />
+										Sammelgewerk – kein Budget-Alarm
+										<span class="text-xs text-gray-400">(für GU die mehrere Gewerke abdecken)</span>
+									</label>
 								</form>
 							</td>
 						{:else}
 							<td class="px-4 py-3">
 								<div class="w-6 h-6 rounded" style="background-color: {gewerk.farbe}"></div>
 							</td>
-							<td class="px-4 py-3 text-sm font-medium">{gewerk.name}</td>
+							<td class="px-4 py-3 text-sm font-medium">
+							<span>{gewerk.name}</span>
+							{#if gewerk.pauschal}
+								<span class="ml-2 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Sammelgewerk</span>
+							{/if}
+						</td>
 							<td class="px-4 py-3 text-right">
 								<button onclick={() => editId = gewerk.id} class="inline-flex items-center gap-1 text-blue-600 text-sm hover:underline mr-3 font-medium transition-colors">
 									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>

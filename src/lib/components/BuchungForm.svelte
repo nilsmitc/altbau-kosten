@@ -14,6 +14,7 @@
 			kategorie?: string;
 			beschreibung?: string;
 			rechnungsreferenz?: string;
+			taetigkeit?: string;
 		};
 		defaultGewerk?: string | null;
 		belege?: string[];
@@ -27,6 +28,9 @@
 
 	const geschosse = $derived([...new Set(raeume.map((r) => r.geschoss))].sort());
 	const isRueckbuchung = $derived((values.betrag ?? 0) < 0);
+
+	let selectedGewerkId = $state(values.gewerk ?? defaultGewerk ?? '');
+	const selectedGewerk = $derived(gewerke.find((g) => g.id === selectedGewerkId));
 
 	const today = new Date().toISOString().slice(0, 10);
 
@@ -66,10 +70,10 @@
 
 		<div>
 			<label for="gewerk" class="block text-sm font-medium text-gray-700 mb-1">Gewerk</label>
-			<select name="gewerk" id="gewerk" required class="input-base">
+			<select name="gewerk" id="gewerk" required class="input-base" onchange={(e) => selectedGewerkId = e.currentTarget.value}>
 				<option value="">— Bitte wählen —</option>
 				{#each gewerke as g}
-					<option value={g.id} selected={(values.gewerk ?? defaultGewerk) === g.id}>{g.name}</option>
+					<option value={g.id} selected={(values.gewerk ?? defaultGewerk) === g.id}>{g.name}{g.pauschal ? ' (Sammelgewerk)' : ''}</option>
 				{/each}
 			</select>
 		</div>
@@ -116,6 +120,20 @@
 		<input type="text" name="beschreibung" id="beschreibung" required
 			value={values.beschreibung ?? ''}
 			placeholder="z.B. Kabel NYM-J 5x2,5"
+			class="input-base" />
+	</div>
+
+	<div>
+		<label for="taetigkeit" class="block text-sm font-medium text-gray-700 mb-1">
+			Tätigkeit <span class="text-gray-400 font-normal">(optional)</span>
+		</label>
+		{#if selectedGewerk?.pauschal}
+			<p class="text-xs text-blue-600 mb-1.5">Sammelgewerk – Tätigkeit angeben für spätere Aufschlüsselung.</p>
+		{/if}
+		<input type="text" name="taetigkeit" id="taetigkeit"
+			value={values.taetigkeit ?? ''}
+			placeholder="z.B. Fliesen Bad, Dämmung Dach, Verputz…"
+			maxlength="80"
 			class="input-base" />
 	</div>
 

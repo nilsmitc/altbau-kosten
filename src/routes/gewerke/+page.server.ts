@@ -35,6 +35,7 @@ export const actions: Actions = {
 		const id = form.get('id') as string;
 		const name = (form.get('name') as string)?.trim();
 		const farbe = form.get('farbe') as string;
+		const pauschal = form.get('pauschal') === 'on';
 
 		if (!name) return fail(400, { error: 'Name ist erforderlich' });
 
@@ -44,6 +45,7 @@ export const actions: Actions = {
 
 		gewerk.name = name;
 		gewerk.farbe = farbe;
+		gewerk.pauschal = pauschal || undefined;
 		schreibeProjekt(projekt);
 		return { success: true };
 	},

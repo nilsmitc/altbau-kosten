@@ -19,8 +19,9 @@ Alle Daten liegen in `/home/nils/Altbau/data/`:
 | `summary.json` | Auto-generierte Zusammenfassung (~1-2 KB) | **Immer zuerst!** Spart Tokens |
 | `projekt.json` | Stammdaten: Gewerke, Räume, Budgets | Bei Stammdaten-Fragen |
 | `buchungen.json` | Alle Kostenbuchungen (wächst) | Nur bei Detail-/Filterfragen |
+| `rechnungen.json` | Rechnungen mit Abschlägen und Nachträgen | Bei Rechnungsfragen |
 
-**Wichtig:** `summary.json` wird automatisch bei jedem Schreibvorgang neu generiert (von der Webapp und manuell). Sie enthält Summen pro Gewerk, Gesamt-Ist/Budget, und die letzten 5 Buchungen.
+**Wichtig:** `summary.json` wird automatisch bei jedem Schreibvorgang neu generiert (von der Webapp und manuell). Sie enthält Summen pro Gewerk, Gesamt-Ist/Budget, die letzten 5 Buchungen und offene Abschläge.
 
 ---
 
@@ -54,7 +55,7 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 ```json
 {
   "gewerke": [
-    { "id": "elektro", "name": "Elektro", "farbe": "#3B82F6", "sortierung": 1 }
+    { "id": "elektro", "name": "Elektro", "farbe": "#3B82F6", "sortierung": 1, "pauschal": true }
   ],
   "raeume": [
     { "id": "bad-eg", "name": "Bad", "geschoss": "EG", "sortierung": 2 }
@@ -76,6 +77,7 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 
 - `farbe`: Hex-Farbcode für Charts
 - `sortierung`: Reihenfolge in Listen (0-basiert)
+- `pauschal`: optional, `true` bei Sammelgewerken (GU die mehrere Gewerke abdecken) → unterdrückt Budget-Ampel
 - `budgets[].gewerk`: Referenz auf `gewerke[].id`
 - Jedes Gewerk hat genau einen Budget-Eintrag
 - `planung[]`: optional, ein Eintrag pro Gewerk; `start`/`ende` leer wenn nicht terminiert
@@ -94,6 +96,7 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
     "kategorie": "Arbeitslohn",
     "beschreibung": "Abschlagzahlung Schweizer Taschenmesserjungs",
     "rechnungsreferenz": "",
+    "taetigkeit": "Fliesen Bad",
     "belege": ["rechnung.pdf"],
     "erstellt": "2026-02-14T18:06:59.500Z",
     "geaendert": "2026-02-14T18:06:59.500Z"
@@ -102,6 +105,7 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 ```
 
 - `betrag`: Integer in Cents. **Negativ bei Rückbuchungen** (`-5000` = −50,00 € Gutschrift)
+- `taetigkeit`: optional, Freitext für Tätigkeitsbeschreibung; besonders bei Sammelgewerken z.B. `"Fliesen Bad"`, `"Dämmung Dach"` – erscheint in der Budget-Aufschlüsselung
 - `raum`: drei mögliche Werte:
   - `null` — kein Ort (allgemeine Kosten)
   - `"bad-eg"` etc. — Einzelraum-ID
@@ -245,6 +249,12 @@ Berechnung: `ist / budget × 100`. Wenn `budget = 0`, keine Ampel.
 **"Welche Gewerke sind über Budget?"**
 → `summary.json` → `gewerke.filter(g => g.differenz < 0)`
 
+**"Welche Gewerke sind Sammelgewerke?"**
+→ `projekt.json` → `gewerke.filter(g => g.pauschal === true)`
+
+**"Welche Tätigkeiten hat ein Sammelgewerk?"**
+→ `buchungen.json` → filtern nach `gewerk`, gruppieren nach `taetigkeit`, summieren `betrag`
+
 ---
 
 ## Projektstruktur
@@ -273,6 +283,9 @@ Altbau/
 │       ├── verlauf/
 │       │   ├── +page.svelte         # Monatsverlauf (Chart + Tabelle + Kategorie-Split)
 │       │   └── +page.server.ts      # Monats-Aggregation
+│       ├── prognose/
+│       │   ├── +page.svelte         # Prognose (Burn Rate, Budget-Erschöpfung, Gewerk-Hochrechnung)
+│       │   └── +page.server.ts      # Prognose-Berechnung (Burn Rate, Chart-Datenpunkte, Tätigkeit-Summaries)
 │       ├── belege/[buchungId]/[dateiname]/+server.ts  # Beleg-Dateien ausliefern
 │       ├── gewerke/+page.svelte     # Gewerke CRUD
 │       ├── raeume/+page.svelte      # Räume CRUD (nach Geschoss gruppiert)
@@ -302,6 +315,54 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 - `/buchungen?monat=2026-02` (vom Monatsverlauf-Link)
 - `/buchungen?raum=@EG` — nur Stockwerk-Buchungen EG
 - `/buchungen?geschoss=EG` — alle EG-Buchungen (Einzelräume + `@EG` kombiniert)
+
+---
+
+## Erweiterungen (20.02.2026)
+
+### Rechnungen + Abschläge (`/rechnungen`)
+Neues Feature: Auftragnehmer-Rechnungen mit mehreren Abschlagszahlungen. Datenmodell:
+- `Rechnung` → mehrere `Abschlag[]` → Bezahlen auto-erstellt `Buchung` mit `rechnungId`-Link
+- `Abschlag.typ`: `'abschlag' | 'schlussrechnung' | 'nachtragsrechnung'`
+- `Abschlag.status`: `'ausstehend' | 'offen' | 'bezahlt'`; `'ueberfaellig'` = computed (offen + Fälligkeit überschritten)
+- Beleg-Upload pro Abschlag; secure Dateiserver unter `/rechnungen/[id]/[abschlagId]/[datei]`
+- Neue Datei: `data/rechnungen.json`
+
+### Nachträge auf Rechnungen
+- `Nachtrag` = genehmigter Mehraufwand (Change Order), getrennt vom Zahlungsvorgang
+- `Rechnung.nachtraege[]` mit Beschreibung + Betrag + optionalem Datum/Notiz
+- Gesamtauftrag = `auftragssumme + Σnachtraege` → Basis für Fortschrittsbalken
+- CRUD auf Rechnungs-Detailseite
+
+### Ausgaben (ehemals Buchungen)
+- Nav-Label "Buchungen" → "Ausgaben"
+- `Buchung.rechnungId?: string` — gesetzt wenn auto-erstellt aus bezahltem Abschlag
+- Herkunft-Filter: `[Alle] [Direkt] [Aus Rechnung]`
+- Rechnung-Badge mit Backlink auf auto-erstellten Zeilen
+
+### Prognose: Gebundene Mittel
+- Offene Abschläge aus Rechnungen als "gebundene Mittel" sichtbar
+- Neue KPI-Karte (orange, nur wenn > 0) + "nach Bindung"-Subtext im Restbudget-KPI
+- Neue Spalte "Gebunden" in der Gewerk-Prognose-Tabelle
+
+### Datumsformat-Fix
+- `format.ts:formatDatum()` nutzt jetzt String-Slicing statt `toLocaleDateString('de-DE')` (ICU-unabhängig)
+
+---
+
+## Erweiterungen (19.02.2026)
+
+### Prognose-Seite (`/prognose`)
+Neue Seite mit Burn-Rate-Projektion, Budget-Erschöpfungsdatum, Linienchart (Ist + Prognose + Budget) und Gewerk-Hochrechnungstabelle. Konfidenz-Banner warnt bei geringer Datenbasis.
+
+### Sammelgewerk-Konzept
+Gewerke können als `pauschal: true` markiert werden (Checkbox in `/gewerke`). Auswirkungen:
+- Dashboard: kein Budget-Alarm für dieses Gewerk
+- Budget-Seite: "Sammelgewerk"-Badge statt Ampel; Tätigkeit-Aufschlüsselung eingeklappt
+- Prognose-Seite: "Sammelgewerk"-Badge statt Risikoampel
+
+### Tätigkeit-Feld auf Buchungen
+Neues optionales Feld `taetigkeit?: string` auf jeder Buchung. Im Buchungsformular unter "Beschreibung", max. 80 Zeichen. Erscheint in der Buchungsliste kursiv als Subtext. Sammelgewerke zeigen Hinweis-Text wenn aktiv.
 
 ---
 
@@ -372,14 +433,15 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 - Letzte Buchungen (10 Einträge)
 - Gewerke-Übersicht mit Fortschrittsbalken (klickbar → /buchungen?gewerk=X)
 
-### Buchungen (`/buchungen`)
+### Ausgaben (`/buchungen`)
 - Volltext-Suche in Beschreibung + Rechnungsreferenz
-- Filter: Gewerk, Raum, Kategorie, Geschoss (kombinierbar, URL-Parameter)
+- Filter: Gewerk, Raum, Kategorie, Herkunft (Direkt / Aus Rechnung), Geschoss (kombinierbar, URL-Parameter)
 - CRUD: Erstellen, Bearbeiten, Löschen
 - **Rückbuchungen**: Checkbox im Formular → negativer `betrag`, rot markiert in Liste
 - **Flexible Ortzuordnung**: Einzelraum, Stockwerk (`@EG`) oder kein Ort
 - Belege anhängen (PDF/JPG/PNG, max 10 MB)
 - Sortierung: neueste Buchungen oben; letztes Gewerk wird vorausgefüllt
+- Rechnung-Badge auf auto-erstellten Einträgen (klickbar → Rechnungs-Detailseite)
 
 ### Monatsverlauf (`/verlauf`)
 - Bar-Chart (Chart.js) – Ausgaben pro Monat chronologisch
@@ -387,9 +449,16 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 - Tabelle: Monat (klickbar → /buchungen gefiltert) | Buchungen | Ausgaben | Kumuliert
 - Kategorie-Aufschlüsselung pro Monat (Material · Arbeitslohn · Sonstiges)
 
+### Prognose (`/prognose`)
+- Konfidenz-Banner: Hinweis auf Datenbasis (Anzahl Monate / Buchungen)
+- KPI-Karten: Burn Rate · Budget-Erschöpfungsdatum · Restbudget (inkl. "nach Bindung") · Bisherige Ausgaben · **Gebundene Mittel** (offene Abschläge, nur wenn > 0)
+- Linienchart: historische Ist-Kurve (blau) + Prognose-Verlängerung gestrichelt (orange) + Budget-Deckellinie (rot)
+- Gewerk-Prognose-Tabelle: proportionale Hochrechnung + **Gebunden**-Spalte (offene Abschläge je Gewerk)
+
 ### Budget (`/budget`)
 - Übersicht: Budget vs. Ist pro Gewerk mit Ampel-Farben
 - Inline-Edit: Budget-Betrag + Notiz pro Gewerk
+- **Sammelgewerke** (`pauschal: true`): kein Ampel-Badge, stattdessen "Sammelgewerk"-Badge + ausgeklappte Tätigkeit-Aufschlüsselung (gruppiert nach `taetigkeit`-Feld der Buchungen)
 
 ### Belege (`/belege`)
 - Übersicht aller hochgeladenen Dokumente
@@ -406,7 +475,21 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 ### Gewerke & Räume (`/gewerke`, `/raeume`)
 - CRUD für Stammdaten
 - Räume gruppiert nach Geschoss
+- Gewerke: Checkbox **"Sammelgewerk – kein Budget-Alarm"** (`pauschal: true`) für GU die mehrere Gewerke abdecken
+
+### Rechnungen (`/rechnungen`)
+- Auftragnehmer-Rechnungen mit mehreren **Abschlägen** (Abschlagszahlungen, Schlussrechnung, Nachtrag)
+- **Nachträge**: genehmigte Mehraufwände (Change Orders) separat von Zahlungsvorgängen
+- Bezahlen eines Abschlags → auto-erstellt Buchung mit Link (`rechnungId`)
+- Beleg-Upload pro Abschlag (PDF/JPG/PNG, max 10 MB)
+- Abschlag-Status: `ausstehend` / `offen` / `bezahlt` / `ueberfaellig` (berechnet)
+- Fortschrittsbalken: Basis = Auftragssumme + Σ Nachträge
+
+### Ausgaben (`/buchungen`) — früher "Buchungen"
+- Alle Buchungen inkl. auto-erstellter aus Rechnungen
+- Filter `herkunft`: `direkt` / `aus Rechnung` — unterscheidet manuelle von auto-Buchungen
+- Badge "📄 Rechnung" auf Zeilen die aus einer Rechnung stammen (klickbar → Rechnung)
 
 ### Einstellungen (`/einstellungen`)
-- **Export**: ZIP-Download mit projekt.json + buchungen.json + alle Belege
+- **Export**: ZIP-Download mit projekt.json + buchungen.json + rechnungen.json + alle Belege
 - **Import**: ZIP hochladen → vollständiges Restore (ersetzt alle Daten)

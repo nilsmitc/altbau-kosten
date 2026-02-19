@@ -13,7 +13,22 @@ export const load: PageServerLoad = () => {
 	const gesamtIst = buchungen.reduce((s, b) => s + b.betrag, 0);
 	const notizen = Object.fromEntries(projekt.budgets.map((b) => [b.gewerk, b.notiz]));
 
-	return { summaries, gesamtBudget, gesamtIst, notizen };
+	// Tätigkeit-Aufschlüsselung für Sammelgewerke
+	const taetigkeitSummaries: Record<string, { taetigkeit: string; betrag: number }[]> = {};
+	for (const s of summaries) {
+		if (!s.gewerk.pauschal) continue;
+		const gb = buchungen.filter((b) => b.gewerk === s.gewerk.id);
+		const map = new Map<string, number>();
+		for (const b of gb) {
+			const t = b.taetigkeit?.trim() || '(ohne Angabe)';
+			map.set(t, (map.get(t) ?? 0) + b.betrag);
+		}
+		taetigkeitSummaries[s.gewerk.id] = [...map.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.map(([taetigkeit, betrag]) => ({ taetigkeit, betrag }));
+	}
+
+	return { summaries, gesamtBudget, gesamtIst, notizen, taetigkeitSummaries };
 };
 
 export const actions: Actions = {

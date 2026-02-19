@@ -5,6 +5,7 @@ export interface Gewerk {
 	name: string;
 	farbe: string;
 	sortierung: number;
+	pauschal?: boolean;
 }
 
 export interface Raum {
@@ -27,6 +28,8 @@ export interface Buchung {
 	kategorie: Kategorie;
 	beschreibung: string;
 	rechnungsreferenz: string;
+	taetigkeit?: string;
+	rechnungId?: string;  // gesetzt wenn auto-erstellt aus bezahltem Abschlag
 	belege: string[];
 	erstellt: string;
 	geaendert: string;
@@ -53,6 +56,50 @@ export interface ProjektData {
 	raeume: Raum[];
 	budgets: Budget[];
 	planung: PlanungEintrag[];
+}
+
+// === Rechnungen & Abschläge ===
+
+export interface Nachtrag {
+	id: string;
+	beschreibung: string;
+	betrag: number; // cents
+	datum?: string; // YYYY-MM-DD
+	notiz?: string;
+	erstellt: string;
+}
+
+export type AbschlagTyp = 'abschlag' | 'schlussrechnung' | 'nachtragsrechnung';
+export type AbschlagStatus = 'ausstehend' | 'offen' | 'bezahlt' | 'ueberfaellig';
+
+export interface Abschlag {
+	id: string;
+	typ: AbschlagTyp;
+	nummer: number;             // auto-increment pro Rechnung (1, 2, 3 …)
+	rechnungsnummer?: string;   // Rechnungsnummer vom Auftragnehmer
+	rechnungsbetrag: number;    // Cents
+	faelligkeitsdatum?: string; // YYYY-MM-DD
+	bezahltam?: string;         // YYYY-MM-DD
+	status: AbschlagStatus;     // 'ausstehend' = noch nicht gestellt
+	buchungId?: string;         // Link zur auto-erstellten Buchung
+	beleg?: string;             // Dateiname in data/rechnungen/{rechnungId}/{abschlagId}/
+	notiz?: string;
+	erstellt: string;
+	geaendert: string;
+}
+
+export interface Rechnung {
+	id: string;
+	gewerk: string;          // Gewerk-ID
+	auftragnehmer: string;
+	kategorie: Kategorie;    // wird für auto-erstellte Buchungen verwendet
+	auftragssumme?: number;  // Cents, optional
+	auftragsdatum?: string;  // YYYY-MM-DD
+	notiz?: string;
+	nachtraege: Nachtrag[];  // genehmigte Mehraufwände (Change Orders)
+	abschlaege: Abschlag[];
+	erstellt: string;
+	geaendert: string;
 }
 
 // === Aggregated Views ===
@@ -103,6 +150,59 @@ export function createBuchung(
 		erstellt: now,
 		geaendert: now
 	};
+}
+
+export function createRechnung(
+	gewerk: string,
+	auftragnehmer: string,
+	kategorie: Kategorie
+): Rechnung {
+	const now = new Date().toISOString();
+	return {
+		id: crypto.randomUUID(),
+		gewerk,
+		auftragnehmer,
+		kategorie,
+		nachtraege: [],
+		abschlaege: [],
+		erstellt: now,
+		geaendert: now
+	};
+}
+
+export function createNachtrag(beschreibung: string, betrag: number): Nachtrag {
+	return {
+		id: crypto.randomUUID(),
+		beschreibung,
+		betrag,
+		erstellt: new Date().toISOString()
+	};
+}
+
+export function createAbschlag(
+	typ: AbschlagTyp,
+	rechnungsbetrag: number,
+	nummer: number
+): Abschlag {
+	const now = new Date().toISOString();
+	return {
+		id: crypto.randomUUID(),
+		typ,
+		nummer,
+		rechnungsbetrag,
+		status: 'offen',
+		erstellt: now,
+		geaendert: now
+	};
+}
+
+/** Berechnet den effektiven Status eines Abschlags (ueberfaellig wenn offen + Fälligkeit überschritten) */
+export function abschlagEffektivStatus(abschlag: Abschlag): AbschlagStatus {
+	if (abschlag.status === 'offen' && abschlag.faelligkeitsdatum) {
+		const heute = new Date().toISOString().slice(0, 10);
+		if (abschlag.faelligkeitsdatum < heute) return 'ueberfaellig';
+	}
+	return abschlag.status;
 }
 
 // === Validation ===

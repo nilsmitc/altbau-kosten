@@ -18,6 +18,6 @@ export function centsToInputValue(cents: number): string {
 }
 
 export function formatDatum(iso: string): string {
-	const d = new Date(iso);
-	return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+	const [year, month, day] = iso.slice(0, 10).split('-');
+	return `${day}.${month}.${year}`;
 }

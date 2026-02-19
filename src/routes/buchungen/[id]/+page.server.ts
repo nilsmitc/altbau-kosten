@@ -26,6 +26,7 @@ export const actions: Actions = {
 		const isRueckbuchung = form.get('rueckbuchung') === 'on';
 		const betragRaw = parseCentsFromInput(form.get('betrag') as string);
 		const betrag = isRueckbuchung ? -Math.abs(betragRaw) : Math.abs(betragRaw);
+		const taetigkeit = (form.get('taetigkeit') as string)?.trim() || undefined;
 		const data = {
 			datum: form.get('datum') as string,
 			betrag,
@@ -33,7 +34,8 @@ export const actions: Actions = {
 			raum: (form.get('raum') as string) || null,
 			kategorie: form.get('kategorie') as Kategorie,
 			beschreibung: (form.get('beschreibung') as string)?.trim(),
-			rechnungsreferenz: (form.get('rechnungsreferenz') as string)?.trim() || ''
+			rechnungsreferenz: (form.get('rechnungsreferenz') as string)?.trim() || '',
+			taetigkeit
 		};
 
 		const projekt = leseProjekt();

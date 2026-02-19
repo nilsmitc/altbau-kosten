@@ -12,6 +12,7 @@ export const load: PageServerLoad = ({ url }) => {
 	const kategorie = url.searchParams.get('kategorie');
 	const suche = url.searchParams.get('suche')?.trim() || null;
 	const monat = url.searchParams.get('monat'); // "YYYY-MM" vom Verlauf-Link
+	const herkunft = url.searchParams.get('herkunft'); // 'direkt' | 'rechnung' | null
 
 	if (gewerk) buchungen = buchungen.filter((b) => b.gewerk === gewerk);
 	if (raum) buchungen = buchungen.filter((b) => b.raum === raum);
@@ -26,6 +27,8 @@ export const load: PageServerLoad = ({ url }) => {
 	}
 	if (kategorie) buchungen = buchungen.filter((b) => b.kategorie === kategorie);
 	if (monat) buchungen = buchungen.filter((b) => b.datum.startsWith(monat));
+	if (herkunft === 'direkt') buchungen = buchungen.filter((b) => !b.rechnungId);
+	if (herkunft === 'rechnung') buchungen = buchungen.filter((b) => !!b.rechnungId);
 	if (suche) {
 		const q = suche.toLowerCase();
 		buchungen = buchungen.filter(
@@ -42,6 +45,6 @@ export const load: PageServerLoad = ({ url }) => {
 		buchungen,
 		gewerke: projekt.gewerke,
 		raeume: projekt.raeume,
-		filter: { gewerk, raum, geschoss, kategorie, suche }
+		filter: { gewerk, raum, geschoss, kategorie, suche, herkunft }
 	};
 };

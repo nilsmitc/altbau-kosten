@@ -7,7 +7,8 @@
 
 	let editGewerk = $state<string | null>(null);
 
-	function ampelClass(ist: number, budget: number): string {
+	function ampelClass(ist: number, budget: number, pauschal?: boolean): string {
+		if (pauschal) return '';
 		if (budget === 0) return '';
 		const pct = ist / budget;
 		if (pct > 1) return 'bg-red-50 text-red-900';
@@ -15,7 +16,8 @@
 		return '';
 	}
 
-	function ampelBadge(ist: number, budget: number): { label: string; class: string } | null {
+	function ampelBadge(ist: number, budget: number, pauschal?: boolean): { label: string; class: string } | null {
+		if (pauschal) return null;
 		if (budget === 0) return null;
 		const pct = Math.round((ist / budget) * 100);
 		if (ist > budget) return { label: `${pct}%`, class: 'bg-red-100 text-red-700' };
@@ -80,7 +82,7 @@
 			</thead>
 			<tbody>
 				{#each data.summaries as s (s.gewerk.id)}
-					<tr class="border-b last:border-b-0 {ampelClass(s.ist, s.budget)}">
+					<tr class="border-b {ampelClass(s.ist, s.budget, s.gewerk.pauschal)}">
 						{#if editGewerk === s.gewerk.id}
 							<td colspan="7" class="px-4 py-3">
 								<form method="POST" action="?/update" use:enhance={() => { return async ({ update }) => { editGewerk = null; update(); }; }} class="flex gap-3 items-end">
@@ -127,7 +129,9 @@
 								{formatCents(s.differenz)}
 							</td>
 							<td class="px-4 py-3 text-center">
-								{#if ampelBadge(s.ist, s.budget)}
+								{#if s.gewerk.pauschal}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Sammelgewerk</span>
+								{:else if ampelBadge(s.ist, s.budget)}
 									{@const badge = ampelBadge(s.ist, s.budget)!}
 									<span class="text-xs px-2 py-0.5 rounded-full font-medium {badge.class}">{badge.label}</span>
 								{:else}
@@ -143,6 +147,18 @@
 							</td>
 						{/if}
 					</tr>
+					{#if s.gewerk.pauschal && data.taetigkeitSummaries[s.gewerk.id]?.length > 0}
+						{#each data.taetigkeitSummaries[s.gewerk.id] as t}
+							<tr class="border-b bg-gray-50/40">
+								<td class="px-4 py-2 pl-10 text-xs text-gray-500 italic">
+									<span class="mr-1 text-gray-300">&#x21B3;</span>{t.taetigkeit}
+								</td>
+								<td colspan="3"></td>
+								<td class="px-4 py-2 text-xs text-right font-mono tabular-nums text-gray-500">{formatCents(t.betrag)}</td>
+								<td colspan="2"></td>
+							</tr>
+						{/each}
+					{/if}
 				{/each}
 			</tbody>
 			<tfoot>

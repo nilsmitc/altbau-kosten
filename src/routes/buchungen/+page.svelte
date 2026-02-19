@@ -33,11 +33,11 @@
 	<div class="flex items-center justify-between">
 		<h1 class="flex items-center gap-2 text-2xl font-bold text-gray-900">
 			<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
-			Buchungen
+			Ausgaben
 		</h1>
 		<a href="/buchungen/neu" class="btn-primary inline-flex items-center gap-1.5">
 			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-			Neue Buchung
+			Neue Ausgabe
 		</a>
 	</div>
 
@@ -73,6 +73,15 @@
 				<option value={k} selected={data.filter.kategorie === k}>{k}</option>
 			{/each}
 		</select>
+
+		<div class="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+			{#each [['', 'Alle'], ['direkt', 'Direkt'], ['rechnung', 'Aus Rechnung']] as [val, label]}
+				<button
+					onclick={() => applyFilter('herkunft', val)}
+					class="rounded px-2.5 py-1 text-xs font-medium transition-colors {data.filter.herkunft === val || (!data.filter.herkunft && val === '') ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}"
+				>{label}</button>
+			{/each}
+		</div>
 	</div>
 
 
@@ -95,8 +104,14 @@
 					<tr class="border-b last:border-b-0 hover:bg-gray-50/50 transition-colors">
 						<td class="px-4 py-3 text-sm whitespace-nowrap">{formatDatum(buchung.datum)}</td>
 						<td class="px-4 py-3 text-sm">
-							<div class="flex items-center gap-1.5">
+							<div class="flex items-center gap-1.5 flex-wrap">
 								{buchung.beschreibung}
+								{#if buchung.rechnungId}
+									<a href="/rechnungen/{buchung.rechnungId}" class="inline-flex items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors">
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+										Rechnung
+									</a>
+								{/if}
 								{#if buchung.belege?.length}
 									<a href="/buchungen/{buchung.id}" class="text-gray-400 hover:text-blue-500 transition-colors" title="{buchung.belege.length} Beleg(e)">
 										<svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
@@ -104,7 +119,12 @@
 									</a>
 								{/if}
 							</div>
-							{#if buchung.rechnungsreferenz}
+							{#if buchung.taetigkeit}
+								<div class="text-xs text-gray-400 mt-0.5 italic">{buchung.taetigkeit}</div>
+							{:else if buchung.rechnungsreferenz}
+								<div class="text-xs text-gray-400 mt-0.5">{buchung.rechnungsreferenz}</div>
+							{/if}
+							{#if buchung.taetigkeit && buchung.rechnungsreferenz}
 								<div class="text-xs text-gray-400 mt-0.5">{buchung.rechnungsreferenz}</div>
 							{/if}
 						</td>
@@ -133,7 +153,7 @@
 				{#if data.buchungen.length === 0}
 					<tr><td colspan="7" class="px-4 py-12 text-center text-gray-400 text-sm">
 					<svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm3.75 11.625a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-					Keine Buchungen gefunden
+					Keine Ausgaben gefunden
 				</td></tr>
 				{/if}
 			</tbody>
@@ -142,7 +162,7 @@
 
 	{#if data.buchungen.length > 0}
 		<div class="text-sm text-gray-500 text-right">
-			{data.buchungen.length} Buchungen, Summe: <span class="font-mono tabular-nums font-medium">{formatCents(data.buchungen.reduce((s, b) => s + b.betrag, 0))}</span>
+			{data.buchungen.length} {data.buchungen.length === 1 ? 'Ausgabe' : 'Ausgaben'}, Summe: <span class="font-mono tabular-nums font-medium">{formatCents(data.buchungen.reduce((s, b) => s + b.betrag, 0))}</span>
 		</div>
 	{/if}
 </div>
