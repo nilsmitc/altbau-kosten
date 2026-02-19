@@ -50,11 +50,19 @@ echo '{"generiert":null,"gesamt":{"ist":0,"budget":0},"gewerke":[],"raeume":[],"
 
 ## Starten
 
+**Linux/Mac:**
+
 ```bash
 npm run dev -- --open
 # oder:
 ./start.sh
 ```
+
+**Windows:**
+
+Doppelklick auf `start.bat` — prüft Node.js, installiert Dependencies beim ersten Start automatisch und öffnet den Browser.
+
+> Node.js muss installiert sein: [nodejs.org](https://nodejs.org) → LTS-Version herunterladen.
 
 App läuft unter `http://localhost:5173`.
 
