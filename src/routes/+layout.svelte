@@ -71,7 +71,7 @@
 
 <div class="min-h-screen bg-gray-50">
 	<nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6">
+		<div class="px-4 sm:px-6">
 			<div class="flex items-center justify-between h-14">
 				<a href="/" class="flex items-center gap-2 font-bold text-lg text-gray-900 hover:text-blue-700 transition-colors">
 					<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +124,7 @@
 		</div>
 	</nav>
 
-	<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+	<main class="px-4 sm:px-6 py-6">
 		{@render children()}
 	</main>
 </div>
