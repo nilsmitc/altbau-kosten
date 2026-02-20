@@ -28,42 +28,44 @@ Web-App zur Kostenverfolgung von Renovierungsprojekten. Lokale SvelteKit-Anwendu
 
 ## Voraussetzungen
 
-- [Node.js](https://nodejs.org/) v22+ (empfohlen: via [nvm](https://github.com/nvm-sh/nvm))
+- [Node.js](https://nodejs.org/) – LTS-Version von [nodejs.org](https://nodejs.org) herunterladen und installieren
+- [Git](https://git-scm.com/) – [git-scm.com](https://git-scm.com/download/win) (Windows) bzw. über Paketmanager (Linux/Mac)
 
-## Installation
+> Git ist für automatische Updates nötig. Ohne Git startet die App trotzdem — nur Updates müssen manuell geholt werden.
+
+## Installation & Start
+
+**Schritt 1:** Repository herunterladen:
 
 ```bash
 git clone https://github.com/nilsmitc/altbau-kosten.git
-cd altbau-kosten
+```
+
+**Schritt 2:** Starten — je nach Betriebssystem:
+
+| Betriebssystem | Starten |
+|----------------|---------|
+| **Windows** | Doppelklick auf `start.bat` |
+| **Linux** | Doppelklick auf `start.sh` (oder Terminal: `./start.sh`) |
+| **Mac** | Terminal: `./start.sh` |
+
+Der Start-Assistent erledigt beim ersten Start alles automatisch:
+- Abhängigkeiten installieren (`npm install`)
+- Datenordner und leere Startdateien anlegen
+
+App läuft unter `http://localhost:5173`.
+
+## Updates
+
+**Automatisch:** Beim nächsten Start via `start.bat` / `start.sh` — `git pull` läuft automatisch.
+
+**Manuell** (falls kein Git):
+```bash
+# Neue Version herunterladen und entpacken, dann:
 npm install
 ```
 
-Datendateien anlegen:
-
-```bash
-mkdir -p data/belege
-echo '{"gewerke":[],"raeume":[],"budgets":[]}' > data/projekt.json
-echo '[]' > data/buchungen.json
-echo '{"generiert":null,"gesamt":{"ist":0,"budget":0},"gewerke":[],"raeume":[],"letzteBuchungen":[]}' > data/summary.json
-```
-
-## Starten
-
-**Linux/Mac:**
-
-```bash
-npm run dev -- --open
-# oder:
-./start.sh
-```
-
-**Windows:**
-
-Doppelklick auf `start.bat` — prüft Node.js, installiert Dependencies beim ersten Start automatisch und öffnet den Browser.
-
-> Node.js muss installiert sein: [nodejs.org](https://nodejs.org) → LTS-Version herunterladen.
-
-App läuft unter `http://localhost:5173`.
+Persönliche Daten in `data/` werden nie überschrieben — nur der Quellcode wird aktualisiert.
 
 ## Datenstruktur
 
