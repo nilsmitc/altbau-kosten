@@ -41,6 +41,7 @@
 			},
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				onClick: (_e, elements) => {
 					if (elements.length > 0) goto(`/buchungen?gewerk=${activeSummaries[elements[0].index].gewerk.id}`);
 				},
@@ -81,6 +82,7 @@
 			},
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				onClick: (_e, elements) => {
 					if (elements.length > 0) goto(`/buchungen?gewerk=${activeSummaries[elements[0].index].gewerk.id}`);
 				},
@@ -116,6 +118,7 @@
 			},
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				onClick: (_e, elements) => {
 					if (elements.length > 0) {
 						const kategorien = ['Material', 'Arbeitslohn', 'Sonstiges'];
@@ -164,6 +167,7 @@
 			},
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				onClick: (_e, elements) => {
 					if (elements.length > 0) goto(`/buchungen?gewerk=${summariesMitIst[elements[0].index].gewerk.id}`);
 				},
@@ -199,24 +203,28 @@
 	});
 </script>
 
-<div class="space-y-6">
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<div class="card p-4">
-			<h3 class="text-sm font-semibold text-gray-700 mb-3">Kosten nach Gewerk</h3>
+<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+	<div class="card p-4">
+		<h3 class="text-sm font-semibold text-gray-700 mb-3">Kosten nach Gewerk</h3>
+		<div class="h-56 relative">
 			<canvas bind:this={doughnutCanvas}></canvas>
 		</div>
-		<div class="card p-4">
-			<h3 class="text-sm font-semibold text-gray-700 mb-3">Budget vs. Ausgaben</h3>
+	</div>
+	<div class="card p-4">
+		<h3 class="text-sm font-semibold text-gray-700 mb-3">Budget vs. Ausgaben</h3>
+		<div class="h-56 relative">
 			<canvas bind:this={barCanvas}></canvas>
 		</div>
 	</div>
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<div class="card p-4">
-			<h3 class="text-sm font-semibold text-gray-700 mb-3">Kostenverteilung nach Kategorie</h3>
+	<div class="card p-4">
+		<h3 class="text-sm font-semibold text-gray-700 mb-3">Kostenverteilung</h3>
+		<div class="h-56 relative">
 			<canvas bind:this={kategorieDonutCanvas}></canvas>
 		</div>
-		<div class="card p-4">
-			<h3 class="text-sm font-semibold text-gray-700 mb-3">Kategorien nach Gewerk</h3>
+	</div>
+	<div class="card p-4">
+		<h3 class="text-sm font-semibold text-gray-700 mb-3">Kategorien nach Gewerk</h3>
+		<div class="h-56 relative">
 			<canvas bind:this={gestapelteBalkenCanvas}></canvas>
 		</div>
 	</div>
