@@ -13,6 +13,8 @@
 	<BuchungForm
 		gewerke={data.gewerke}
 		raeume={data.raeume}
+		lieferanten={data.lieferanten}
+		lieferungen={data.lieferungen}
 		values={form?.values}
 		defaultGewerk={data.lastGewerk}
 		error={form?.error}

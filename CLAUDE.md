@@ -20,6 +20,7 @@ Alle Daten liegen in `/home/nils/Altbau/data/`:
 | `projekt.json` | Stammdaten: Gewerke, Räume, Budgets | Bei Stammdaten-Fragen |
 | `buchungen.json` | Alle Kostenbuchungen (wächst) | Nur bei Detail-/Filterfragen |
 | `rechnungen.json` | Rechnungen mit Abschlägen und Nachträgen | Bei Rechnungsfragen |
+| `lieferanten.json` | Lieferanten + Lieferungen (Händlerrechnungen) | Bei Lieferanten-/Materialfragen |
 
 **Wichtig:** `summary.json` wird automatisch bei jedem Schreibvorgang neu generiert (von der Webapp und manuell). Sie enthält Summen pro Gewerk, Gesamt-Ist/Budget, die letzten 5 Buchungen und offene Abschläge.
 
@@ -62,15 +63,6 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
   ],
   "budgets": [
     { "gewerk": "elektro", "geplant": 800000, "notiz": "" }
-  ],
-  "planung": [
-    {
-      "gewerk": "elektro",
-      "start": "2026-03-01",
-      "ende": "2026-03-15",
-      "status": "geplant",
-      "nachGewerk": ["trockenbau"]
-    }
   ]
 }
 ```
@@ -80,9 +72,6 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 - `pauschal`: optional, `true` bei Sammelgewerken (GU die mehrere Gewerke abdecken) → unterdrückt Budget-Ampel
 - `budgets[].gewerk`: Referenz auf `gewerke[].id`
 - Jedes Gewerk hat genau einen Budget-Eintrag
-- `planung[]`: optional, ein Eintrag pro Gewerk; `start`/`ende` leer wenn nicht terminiert
-- `planung[].status`: `"geplant"` | `"aktiv"` | `"fertig"`
-- `planung[].nachGewerk`: Gewerk-IDs die nach diesem starten können (Abhängigkeiten)
 
 ### buchungen.json
 ```json
@@ -106,6 +95,8 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 
 - `betrag`: Integer in Cents. **Negativ bei Rückbuchungen** (`-5000` = −50,00 € Gutschrift)
 - `taetigkeit`: optional, Freitext für Tätigkeitsbeschreibung; besonders bei Sammelgewerken z.B. `"Fliesen Bad"`, `"Dämmung Dach"` – erscheint in der Budget-Aufschlüsselung
+- `lieferungId`: optional, gesetzt wenn Buchung auto-erstellt aus einer Lieferung
+- `rechnungId`: optional, gesetzt wenn Buchung auto-erstellt aus bezahltem Abschlag
 - `raum`: drei mögliche Werte:
   - `null` — kein Ort (allgemeine Kosten)
   - `"bad-eg"` etc. — Einzelraum-ID
@@ -135,6 +126,42 @@ Umrechnung: `Euro × 100 = Cents`. Also 3.000 € → `300000`.
 - `differenz`: `budget - ist` (positiv = unter Budget, negativ = über Budget)
 - `raeume`: nur Räume mit `ist > 0` (Räume ohne Buchungen werden ausgelassen)
 - `letzteBuchungen`: die 5 neuesten, sortiert nach Erstellungszeitpunkt
+
+### lieferanten.json
+```json
+{
+  "lieferanten": [
+    { "id": "hornbach", "name": "Hornbach", "notiz": "Kundennr. 12345", "erstellt": "...", "geaendert": "..." }
+  ],
+  "lieferungen": [
+    {
+      "id": "uuid-v4",
+      "lieferantId": "hornbach",
+      "datum": "2026-02-20",
+      "beschreibung": "Fliesen Bad EG",
+      "rechnungsnummer": "RG-2026-001",
+      "lieferscheinnummer": "LS-001",
+      "betrag": 85000,
+      "gewerk": "fliesen",
+      "positionen": [
+        { "beschreibung": "Bodenfliesen 30×30", "menge": "20 m²", "betrag": 60000 }
+      ],
+      "belege": ["rechnung.pdf"],
+      "notiz": "",
+      "buchungId": "uuid-der-auto-buchung",
+      "erstellt": "...",
+      "geaendert": "..."
+    }
+  ]
+}
+```
+
+- `lieferant.id`: slugified Name (`"hornbach"`, `"bauhaus"`)
+- `lieferung.betrag`: Rechnungsbetrag laut Händlerrechnung in Cents (optional); **negativ bei Gutschriften** (z.B. `-50503` = −505,03 € Gutschrift) → rot in der UI, Gesamtsumme wird korrekt reduziert
+- `lieferung.gewerk`: Gewerk-Zuordnung für auto-Buchung (optional)
+- `lieferung.buchungId`: Link zur auto-erstellten Buchung in `buchungen.json` — gesetzt sobald `betrag` + `gewerk` vorhanden sind
+- `lieferung.positionen`: aus PDF extrahierte Einzelpositionen (optional, nur Info)
+- **Auto-Buchung:** Sobald `betrag` + `gewerk` gesetzt sind, wird automatisch eine Buchung mit `kategorie = "Material"` in `buchungen.json` angelegt. Diese erscheint in Ausgaben und fließt ins Dashboard ein. Beim Bearbeiten wird synchronisiert; beim Löschen der Lieferung wird die auto-Buchung mitgelöscht.
 
 ---
 
@@ -263,36 +290,50 @@ Berechnung: `ist / budget × 100`. Wenn `budget = 0`, keine Ampel.
 Altbau/
 ├── data/                           # JSON-Daten (gemeinsam für Webapp + Claude Code)
 │   ├── projekt.json                # Gewerke, Räume, Budgets
-│   ├── buchungen.json              # Alle Buchungen
-│   ├── belege/                     # Beleg-Dateien (PDF/Bilder), ein Ordner pro Buchung
+│   ├── buchungen.json              # Alle Buchungen (inkl. auto-erstellter)
+│   ├── rechnungen.json             # Rechnungen mit Abschlägen und Nachträgen
+│   ├── lieferanten.json            # Lieferanten + Lieferungen
+│   ├── belege/                     # Beleg-Dateien pro Buchung
+│   ├── rechnungen/                 # Belege pro Abschlag ({rechnungId}/{abschlagId}/)
+│   ├── lieferungen/                # Belege pro Lieferung ({lieferungId}/)
 │   └── summary.json                # Auto-generiert
 ├── src/
 │   ├── lib/
 │   │   ├── domain.ts               # Types, Factories, Validierung, Aggregation
 │   │   ├── dataStore.ts            # JSON Datei-I/O (server-only, synchron)
 │   │   ├── format.ts               # formatCents(), parseCentsFromInput(), formatDatum()
+│   │   ├── pdfExtract.ts           # PDF-Textextraktion via pdf-parse v2 (für Lieferungen)
 │   │   └── components/
 │   │       ├── BuchungForm.svelte   # Wiederverwendbares Buchungs-Formular
-│   │       └── Charts.svelte        # Doughnut + Bar Chart (Chart.js)
+│   │       ├── Charts.svelte        # Doughnut + Bar Chart (Chart.js)
+│   │       └── VerlaufSection.svelte # Monatsverlauf-Component (Bar, Line, Tabelle) – im Dashboard eingebunden
 │   └── routes/
-│       ├── +page.svelte             # Dashboard (KPIs, Charts, Warnungen, Top-Raum, letzte Buchungen)
+│       ├── +page.svelte             # Dashboard (KPIs, Charts, Warnungen, Top-Raum, letzte Buchungen, Monatsverlauf)
 │       ├── buchungen/
 │       │   ├── +page.svelte         # Liste mit Filtern + Volltext-Suche
 │       │   ├── neu/+page.svelte     # Neue Buchung
 │       │   └── [id]/+page.svelte    # Bearbeiten/Löschen
 │       ├── verlauf/
-│       │   ├── +page.svelte         # Monatsverlauf (Chart + Tabelle + Kategorie-Split)
+│       │   ├── +page.svelte         # Monatsverlauf (direkt erreichbar, aber nicht im Nav)
 │       │   └── +page.server.ts      # Monats-Aggregation
 │       ├── prognose/
 │       │   ├── +page.svelte         # Prognose (Burn Rate, Budget-Erschöpfung, Gewerk-Hochrechnung)
 │       │   └── +page.server.ts      # Prognose-Berechnung (Burn Rate, Chart-Datenpunkte, Tätigkeit-Summaries)
-│       ├── belege/[buchungId]/[dateiname]/+server.ts  # Beleg-Dateien ausliefern
+│       ├── lieferanten/
+│       │   ├── +page.svelte         # Lieferanten-Übersicht (CRUD)
+│       │   ├── +page.server.ts      # Lieferant anlegen/löschen
+│       │   └── [id]/
+│       │       ├── +page.svelte     # Lieferant-Detail: Lieferungen + Belege + Edit
+│       │       └── +page.server.ts  # Actions: Lieferung CRUD + Beleg-Upload + syncBuchung
+│       ├── lieferungen/[id]/[dateiname]/+server.ts  # Lieferungs-Belege ausliefern
+│       ├── belege/[buchungId]/[dateiname]/+server.ts  # Buchungs-Belege ausliefern
 │       ├── gewerke/+page.svelte     # Gewerke CRUD
 │       ├── raeume/+page.svelte      # Räume CRUD (nach Geschoss gruppiert)
 │       ├── budget/+page.svelte      # Budget-Tabelle mit Ampel + Inline-Edit + Notizen
-│       ├── planung/+page.svelte     # Bauplaner (Gantt-Chart, Abhängigkeiten, Status)
 │       ├── einstellungen/+page.svelte  # Export / Import (ZIP-Backup)
-│       └── api/export/+server.ts    # GET-Endpoint: ZIP-Download aller Daten
+│       └── api/
+│           ├── export/+server.ts    # GET-Endpoint: ZIP-Download aller Daten
+│           └── pdf-analyse/+server.ts  # POST-Endpoint: PDF → Datum/Betrag/Rg-Nr./Positionen
 ├── start.sh                         # Dev-Server starten + Browser öffnen
 ├── altbau-kosten.desktop            # Desktop-Shortcut
 ├── CLAUDE.md                        # Diese Datei
@@ -318,7 +359,28 @@ Alle Filter funktionieren über URL-Parameter – kombinierbar, browser-back-fä
 
 ---
 
-## Erweiterungen (20.02.2026)
+## Erweiterungen (20.02.2026) — Lieferanten
+
+### Lieferanten + Lieferungen (`/lieferanten`)
+Neues Feature: Materialeinkäufe bei Händlern (Hornbach, Bauhaus etc.) erfassen.
+- Lieferant anlegen (Name slugified als ID) + Notiz/Kundennummer
+- Lieferungen pro Lieferant: Datum, Beschreibung, Betrag, Gewerk, Rechnungs-/Lieferscheinnummer
+- Beleg-Upload pro Lieferung (PDF/JPG/PNG, max 10 MB), secure Fileserver unter `/lieferungen/[id]/[datei]`
+- **Auto-Buchung**: Sobald `betrag` + `gewerk` gesetzt → Buchung in `buchungen.json` (kategorie = `"Material"`) → erscheint in Ausgaben + Dashboard. `lieferung.buchungId` ↔ `buchung.lieferungId` verknüpfen bidirektional.
+- **syncLieferungBuchung()**: Helper in `[id]/+page.server.ts` — erstellt/aktualisiert/löscht die auto-Buchung bei jeder Mutation
+- Badge "In Ausgaben" (grün) wenn buchungId gesetzt, "Kein Gewerk – nicht in Ausgaben" (gelb) wenn betrag aber kein gewerk
+- Löschen der Lieferung löscht auto-Buchung mit; manuell verknüpfte Buchungen (lieferungId gesetzt, aber nicht die auto-Buchung) blockieren Löschen
+- **PDF-Extraktion**: Beleg-Upload → POST `/api/pdf-analyse` → KI-gestützte Extraktion von Datum, Betrag, Rg.-Nr., Einzelpositionen (via pdf-parse v2 + Regex-Heuristik)
+- Neue Datei: `data/lieferanten.json` mit `{ lieferanten: [], lieferungen: [] }`
+- Neue Dateipfade: `data/lieferungen/{lieferungId}/datei`
+
+### Ausgaben — Herkunft Lieferung
+- Filter `herkunft`: ergänzt um `aus Lieferung`
+- Badge "Lieferant" auf auto-erstellten Zeilen (klickbar → Lieferant-Detailseite)
+
+---
+
+## Erweiterungen (20.02.2026) — Rechnungen
 
 ### Rechnungen + Abschläge (`/rechnungen`)
 Neues Feature: Auftragnehmer-Rechnungen mit mehreren Abschlagszahlungen. Datenmodell:
@@ -420,10 +482,10 @@ Neues optionales Feld `taetigkeit?: string` auf jeder Buchung. Im Buchungsformul
 
 ---
 
-## Features (Stand 17.02.2026)
+## Features (Stand 20.02.2026, aktualisiert)
 
 ### Dashboard (`/`)
-- 6 KPI-Karten: Budget, Ausgaben, Verbleibend, Verbraucht%, Top-Raum (klickbar), **Burn Rate** (Ø/Monat + Hochrechnung Restbudget)
+- KPI-Karten (je nach Datenlage 4–8): Budget · Ausgaben · Verbleibend · Verbraucht% · Top-Raum (klickbar) · **Ausstehend** (gestellte unbezahlte Abschläge, orange/rot) · **Gebunden** (Vertragssummen noch nicht fakturiert, blau) · **Burn Rate** (Ø/Monat + Hochrechnung Restbudget)
 - Budget-Warnungen: gelbe/rote Badges für Gewerke ≥80% (nur sichtbar wenn relevant)
 - Charts (alle klickbar → navigieren zu gefilterten Buchungen):
   - Doughnut: Kostenanteile nach Gewerk
@@ -432,22 +494,17 @@ Neues optionales Feld `taetigkeit?: string` auf jeder Buchung. Im Buchungsformul
   - Gestapelter Balken: Kategorien nach Gewerk
 - Letzte Buchungen (10 Einträge)
 - Gewerke-Übersicht mit Fortschrittsbalken (klickbar → /buchungen?gewerk=X)
+- **Monatsverlauf** direkt integriert (via `VerlaufSection.svelte`): Balken-Chart + Linien-Chart + Tabelle
 
 ### Ausgaben (`/buchungen`)
 - Volltext-Suche in Beschreibung + Rechnungsreferenz
-- Filter: Gewerk, Raum, Kategorie, Herkunft (Direkt / Aus Rechnung), Geschoss (kombinierbar, URL-Parameter)
+- Filter: Gewerk, Raum, Kategorie, Herkunft (Direkt / Aus Rechnung / Aus Lieferung), Geschoss (kombinierbar, URL-Parameter)
 - CRUD: Erstellen, Bearbeiten, Löschen
 - **Rückbuchungen**: Checkbox im Formular → negativer `betrag`, rot markiert in Liste
 - **Flexible Ortzuordnung**: Einzelraum, Stockwerk (`@EG`) oder kein Ort
 - Belege anhängen (PDF/JPG/PNG, max 10 MB)
 - Sortierung: neueste Buchungen oben; letztes Gewerk wird vorausgefüllt
 - Rechnung-Badge auf auto-erstellten Einträgen (klickbar → Rechnungs-Detailseite)
-
-### Monatsverlauf (`/verlauf`)
-- Bar-Chart (Chart.js) – Ausgaben pro Monat chronologisch
-- Linienchart – kumulierte Gesamtausgaben über Zeit
-- Tabelle: Monat (klickbar → /buchungen gefiltert) | Buchungen | Ausgaben | Kumuliert
-- Kategorie-Aufschlüsselung pro Monat (Material · Arbeitslohn · Sonstiges)
 
 ### Prognose (`/prognose`)
 - Konfidenz-Banner: Hinweis auf Datenbasis (Anzahl Monate / Buchungen)
@@ -461,35 +518,42 @@ Neues optionales Feld `taetigkeit?: string` auf jeder Buchung. Im Buchungsformul
 - **Sammelgewerke** (`pauschal: true`): kein Ampel-Badge, stattdessen "Sammelgewerk"-Badge + ausgeklappte Tätigkeit-Aufschlüsselung (gruppiert nach `taetigkeit`-Feld der Buchungen)
 
 ### Belege (`/belege`)
-- Übersicht aller hochgeladenen Dokumente
-- Filter nach Gewerk
-- Direkter Download/Anzeige
-
-### Bauplaner (`/planung`)
-- CSS-only Gantt-Chart (kein zusätzliches Package)
-- Status pro Gewerk: `geplant` / `aktiv` / `fertig`
-- Abhängigkeiten: „Danach kommt" per Checkbox
-- „Als nächstes bereit"-Panel: Gewerke ohne unfertige Vorgänger
-- ⚠-Warnung wenn Startdatum vor Ende eines Vorgängers
+- Übersicht **aller** hochgeladenen Dokumente aus allen 3 Quellen:
+  - Buchungs-Belege (`data/belege/{buchungId}/`) → Link zu Buchung bearbeiten
+  - Abschlag-Belege (`data/rechnungen/{rId}/{aId}/`) → Link zu Auftrags-Detail
+  - Lieferungs-Belege (`data/lieferungen/{lId}/`) → Link zu Lieferant-Detail
+- Typ-Badge (Buchung / Abschlag / Lieferung) auf jeder Karte
+- Filter nach Gewerk; direkter Download/Anzeige per Link
 
 ### Gewerke & Räume (`/gewerke`, `/raeume`)
 - CRUD für Stammdaten
 - Räume gruppiert nach Geschoss
 - Gewerke: Checkbox **"Sammelgewerk – kein Budget-Alarm"** (`pauschal: true`) für GU die mehrere Gewerke abdecken
 
-### Rechnungen (`/rechnungen`)
+### Aufträge (`/rechnungen`)
 - Auftragnehmer-Rechnungen mit mehreren **Abschlägen** (Abschlagszahlungen, Schlussrechnung, Nachtrag)
 - **Nachträge**: genehmigte Mehraufwände (Change Orders) separat von Zahlungsvorgängen
 - Bezahlen eines Abschlags → auto-erstellt Buchung mit Link (`rechnungId`)
 - Beleg-Upload pro Abschlag (PDF/JPG/PNG, max 10 MB)
 - Abschlag-Status: `ausstehend` / `offen` / `bezahlt` / `ueberfaellig` (berechnet)
 - Fortschrittsbalken: Basis = Auftragssumme + Σ Nachträge
+- Nav-Label: **"Aufträge"** (URL bleibt `/rechnungen`)
 
-### Ausgaben (`/buchungen`) — früher "Buchungen"
-- Alle Buchungen inkl. auto-erstellter aus Rechnungen
-- Filter `herkunft`: `direkt` / `aus Rechnung` — unterscheidet manuelle von auto-Buchungen
-- Badge "📄 Rechnung" auf Zeilen die aus einer Rechnung stammen (klickbar → Rechnung)
+### Ausgaben (`/buchungen`) — Herkunfts-Filter
+- Alle Buchungen inkl. auto-erstellter aus Rechnungen und Lieferungen
+- Filter `herkunft`: `direkt` / `aus Rechnung` / `aus Lieferung` — unterscheidet manuelle von auto-Buchungen
+- Badge "📄 Rechnung" auf Zeilen aus Rechnungen (klickbar → Rechnung)
+- Badge "Lieferant" auf Zeilen aus Lieferungen (klickbar → Lieferant-Detailseite)
+
+### Lieferanten (`/lieferanten`)
+- Händler (Hornbach, Bauhaus etc.) anlegen mit Name + optionaler Notiz/Kundennummer
+- Lieferungen pro Lieferant mit Datum, Beschreibung, Betrag, Gewerk, Rg.-/Lieferscheinnummer
+- Beleg-Upload pro Lieferung (PDF/JPG/PNG) + **automatische PDF-Extraktion** (Datum, Betrag, Rg.-Nr., Positionen)
+- **Gutschriften**: Checkbox "Gutschrift / Rückbuchung" → negatives `betrag`, rot markiert, Gesamtsumme wird korrekt reduziert
+- Auto-Buchung: sobald `betrag` + `gewerk` vorhanden → Buchung in Ausgaben + Dashboard; bei Gutschriften negative Buchung
+- Badge "In Ausgaben" (grün) / "Kein Gewerk" (gelb) zeigt Buchungs-Status je Lieferung
+- Inline-Bearbeitung bestehender Lieferungen
 
 ### Einstellungen (`/einstellungen`)
-- **Export**: ZIP-Download mit projekt.json + buchungen.json + rechnungen.json + alle Belege
+- **Export**: ZIP-Download mit projekt.json + buchungen.json + rechnungen.json + lieferanten.json + alle Belege
 - **Import**: ZIP hochladen → vollständiges Restore (ersetzt alle Daten)

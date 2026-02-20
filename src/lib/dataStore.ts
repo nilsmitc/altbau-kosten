@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync, rmSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
-import type { ProjektData, Buchung, Rechnung } from './domain.js';
+import type { ProjektData, Buchung, Rechnung, LieferantenData } from './domain.js';
 import { berechneGewerkSummaries, berechneRaumSummaries, abschlagEffektivStatus } from './domain.js';
 
 const DATA_DIR = join(process.cwd(), 'data');
@@ -21,12 +21,15 @@ function rechnungenPath(): string {
 	return join(DATA_DIR, 'rechnungen.json');
 }
 
+function lieferantenPath(): string {
+	return join(DATA_DIR, 'lieferanten.json');
+}
+
 // === Read ===
 
 export function leseProjekt(): ProjektData {
 	try {
-		const parsed = JSON.parse(readFileSync(projektPath(), 'utf-8'));
-		return { planung: [], ...parsed };
+		return JSON.parse(readFileSync(projektPath(), 'utf-8'));
 	} catch {
 		throw new Error(`projekt.json konnte nicht gelesen werden – Datei fehlt oder ist beschädigt`);
 	}
@@ -52,6 +55,19 @@ export function leseRechnungen(): Rechnung[] {
 	}
 }
 
+export function leseLieferanten(): LieferantenData {
+	if (!existsSync(lieferantenPath())) return { lieferanten: [], lieferungen: [] };
+	try {
+		const parsed = JSON.parse(readFileSync(lieferantenPath(), 'utf-8'));
+		return {
+			lieferanten: parsed.lieferanten ?? [],
+			lieferungen: (parsed.lieferungen ?? []).map((l: any) => ({ belege: [], ...l }))
+		};
+	} catch {
+		throw new Error(`lieferanten.json konnte nicht gelesen werden – Datei fehlt oder ist beschädigt`);
+	}
+}
+
 // === Write ===
 
 export function schreibeProjekt(data: ProjektData): void {
@@ -67,6 +83,10 @@ export function schreibeBuchungen(buchungen: Buchung[]): void {
 export function schreibeRechnungen(rechnungen: Rechnung[]): void {
 	writeFileSync(rechnungenPath(), JSON.stringify(rechnungen, null, 2) + '\n', 'utf-8');
 	aktualisiereSummary();
+}
+
+export function schreibeLieferanten(data: LieferantenData): void {
+	writeFileSync(lieferantenPath(), JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
 // === Belege ===
@@ -136,6 +156,40 @@ export function loescheBelegRechnung(
 ): void {
 	const pfad = join(belegePfadRechnung(rechnungId, abschlagId), dateiname);
 	if (existsSync(pfad)) unlinkSync(pfad);
+}
+
+// === Belege für Lieferungen ===
+
+export function belegePfadLieferung(lieferungId: string): string {
+	return join(DATA_DIR, 'lieferungen', lieferungId);
+}
+
+export function speicherBelegLieferung(
+	lieferungId: string,
+	dateiname: string,
+	buffer: Buffer
+): string {
+	const dir = belegePfadLieferung(lieferungId);
+	mkdirSync(dir, { recursive: true });
+	const safe = dateiname.replace(/[^a-zA-Z0-9._-]/g, '_');
+	writeFileSync(join(dir, safe), buffer);
+	return safe;
+}
+
+export function leseBelegLieferung(lieferungId: string, dateiname: string): Buffer | null {
+	const pfad = join(belegePfadLieferung(lieferungId), dateiname);
+	if (!existsSync(pfad)) return null;
+	return readFileSync(pfad);
+}
+
+export function loescheBelegLieferung(lieferungId: string, dateiname: string): void {
+	const pfad = join(belegePfadLieferung(lieferungId), dateiname);
+	if (existsSync(pfad)) unlinkSync(pfad);
+}
+
+export function loescheBelegeOrdnerLieferung(lieferungId: string): void {
+	const dir = belegePfadLieferung(lieferungId);
+	if (existsSync(dir)) rmSync(dir, { recursive: true });
 }
 
 export function contentType(dateiname: string): string {

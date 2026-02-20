@@ -24,6 +24,8 @@
 	<BuchungForm
 		gewerke={data.gewerke}
 		raeume={data.raeume}
+		lieferanten={data.lieferanten}
+		lieferungen={data.lieferungen}
 		values={(form as any)?.values ?? data.buchung}
 		belege={data.buchung.belege}
 		buchungId={data.buchung.id}

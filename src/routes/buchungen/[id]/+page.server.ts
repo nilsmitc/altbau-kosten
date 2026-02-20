@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { leseProjekt, leseBuchungen, schreibeBuchungen, speicherBeleg, loescheBeleg, loescheBelegeOrdner } from '$lib/dataStore';
+import { leseProjekt, leseBuchungen, schreibeBuchungen, speicherBeleg, loescheBeleg, loescheBelegeOrdner, leseLieferanten } from '$lib/dataStore';
 import { validateBuchung, KATEGORIEN, type Kategorie } from '$lib/domain';
 import { parseCentsFromInput } from '$lib/format';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -11,11 +11,15 @@ export const load: PageServerLoad = ({ params }) => {
 
 	if (!buchung) throw error(404, 'Buchung nicht gefunden');
 
+	const { lieferanten, lieferungen } = leseLieferanten();
+
 	return {
 		buchung,
 		gewerke: projekt.gewerke,
 		raeume: projekt.raeume,
-		kategorien: KATEGORIEN
+		kategorien: KATEGORIEN,
+		lieferanten,
+		lieferungen
 	};
 };
 
@@ -27,6 +31,7 @@ export const actions: Actions = {
 		const betragRaw = parseCentsFromInput(form.get('betrag') as string);
 		const betrag = isRueckbuchung ? -Math.abs(betragRaw) : Math.abs(betragRaw);
 		const taetigkeit = (form.get('taetigkeit') as string)?.trim() || undefined;
+		const lieferungId = (form.get('lieferungId') as string)?.trim() || undefined;
 		const data = {
 			datum: form.get('datum') as string,
 			betrag,
@@ -35,7 +40,8 @@ export const actions: Actions = {
 			kategorie: form.get('kategorie') as Kategorie,
 			beschreibung: (form.get('beschreibung') as string)?.trim(),
 			rechnungsreferenz: (form.get('rechnungsreferenz') as string)?.trim() || '',
-			taetigkeit
+			taetigkeit,
+			lieferungId
 		};
 
 		const projekt = leseProjekt();

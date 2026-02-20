@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { KATEGORIEN, type Gewerk, type Raum } from '$lib/domain';
+	import { KATEGORIEN, type Gewerk, type Raum, type Lieferant, type Lieferung } from '$lib/domain';
 	import { centsToInputValue } from '$lib/format';
 
 	interface Props {
 		gewerke: Gewerk[];
 		raeume: Raum[];
+		lieferanten?: Lieferant[];
+		lieferungen?: Lieferung[];
 		values?: {
 			datum?: string;
 			betrag?: number;
@@ -15,6 +17,7 @@
 			beschreibung?: string;
 			rechnungsreferenz?: string;
 			taetigkeit?: string;
+			lieferungId?: string;
 		};
 		defaultGewerk?: string | null;
 		belege?: string[];
@@ -24,7 +27,19 @@
 		action?: string;
 	}
 
-	let { gewerke, raeume, values = {}, defaultGewerk = null, belege = [], buchungId, error = '', submitLabel = 'Speichern', action }: Props = $props();
+	let { gewerke, raeume, lieferanten = [], lieferungen = [], values = {}, defaultGewerk = null, belege = [], buchungId, error = '', submitLabel = 'Speichern', action }: Props = $props();
+
+	// Lieferant aus vorhandener lieferungId ableiten (für Edit-Modus)
+	const vorhandenerLieferantId = values.lieferungId
+		? (lieferungen.find((lu) => lu.id === values.lieferungId)?.lieferantId ?? '')
+		: '';
+
+	let selectedLieferantId = $state(vorhandenerLieferantId);
+	const gefilterteLieferungen = $derived(
+		selectedLieferantId
+			? lieferungen.filter((lu) => lu.lieferantId === selectedLieferantId)
+			: lieferungen
+	);
 
 	const geschosse = $derived([...new Set(raeume.map((r) => r.geschoss))].sort());
 	const isRueckbuchung = $derived((values.betrag ?? 0) < 0);
@@ -136,6 +151,45 @@
 			maxlength="80"
 			class="input-base" />
 	</div>
+
+	<!-- Lieferant & Lieferung -->
+	{#if lieferanten.length > 0}
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+			<div>
+				<label for="lieferant-select" class="block text-sm font-medium text-gray-700 mb-1">
+					Lieferant <span class="text-gray-400 font-normal">(optional)</span>
+				</label>
+				<select
+					id="lieferant-select"
+					class="input-base"
+					onchange={(e) => { selectedLieferantId = e.currentTarget.value; }}
+				>
+					<option value="">— Kein Lieferant —</option>
+					{#each lieferanten as l}
+						<option value={l.id} selected={selectedLieferantId === l.id}>{l.name}</option>
+					{/each}
+				</select>
+				<p class="text-xs text-gray-400 mt-1">Filtert die Lieferungs-Auswahl</p>
+			</div>
+
+			<div>
+				<label for="lieferungId" class="block text-sm font-medium text-gray-700 mb-1">
+					Lieferung <span class="text-gray-400 font-normal">(optional)</span>
+				</label>
+				<select name="lieferungId" id="lieferungId" class="input-base">
+					<option value="">— Keine Lieferung —</option>
+					{#each gefilterteLieferungen as lu}
+						<option value={lu.id} selected={values.lieferungId === lu.id}>
+							{lu.datum}{lu.beschreibung ? ' – ' + lu.beschreibung : ''}{lu.rechnungsnummer ? ' (Rg. ' + lu.rechnungsnummer + ')' : ''}
+						</option>
+					{/each}
+				</select>
+				{#if selectedLieferantId && gefilterteLieferungen.length === 0}
+					<p class="text-xs text-yellow-600 mt-1">Noch keine Lieferungen für diesen Lieferanten</p>
+				{/if}
+			</div>
+		</div>
+	{/if}
 
 	<!-- Belege -->
 	<div>

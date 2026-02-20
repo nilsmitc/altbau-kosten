@@ -17,6 +17,12 @@
 	}
 
 	const totalBelege = $derived(data.eintraege.reduce((s, e) => s + e.belege.length, 0));
+
+	const typLabel: Record<string, string> = {
+		buchung: 'Buchung',
+		abschlag: 'Abschlag',
+		lieferung: 'Lieferung'
+	};
 </script>
 
 <div class="space-y-6">
@@ -43,27 +49,32 @@
 		</div>
 	{:else}
 		<div class="space-y-4">
-			{#each data.eintraege as eintrag (eintrag.buchungId)}
+			{#each data.eintraege as eintrag (eintrag.key)}
 				<div class="card p-4">
-					<!-- Buchungs-Info -->
+					<!-- Info -->
 					<div class="flex items-start justify-between mb-3">
 						<div>
 							<div class="font-medium text-gray-900">{eintrag.beschreibung}</div>
 							<div class="text-sm text-gray-500 mt-0.5">
-								{formatDatum(eintrag.datum)} &middot; {eintrag.gewerkName} &middot; <span class="font-mono tabular-nums">{formatCents(eintrag.betrag)}</span>
+								{eintrag.datum ? formatDatum(eintrag.datum) : '—'} &middot; {eintrag.gewerkName} &middot; <span class="font-mono tabular-nums">{formatCents(eintrag.betrag)}</span>
 							</div>
 						</div>
-						<a href="/buchungen/{eintrag.buchungId}" class="text-blue-600 hover:underline text-sm font-medium shrink-0 ml-4">
-							Bearbeiten
-						</a>
+						<div class="flex items-center gap-2 shrink-0 ml-4">
+							<span class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
+								{typLabel[eintrag.typ]}
+							</span>
+							<a href={eintrag.editHref} class="text-blue-600 hover:underline text-sm font-medium">
+								{eintrag.typ === 'buchung' ? 'Bearbeiten' : 'Öffnen'}
+							</a>
+						</div>
 					</div>
 
 					<!-- Belege -->
 					<div class="flex flex-wrap gap-2">
 						{#each eintrag.belege as beleg}
-							<a href="/belege/{eintrag.buchungId}/{beleg}" target="_blank"
+							<a href={beleg.href} target="_blank" rel="noopener noreferrer"
 								class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-md px-3 py-1.5 text-sm hover:bg-gray-100 hover:border-gray-300 transition-all">
-								{#if isPdf(beleg)}
+								{#if isPdf(beleg.dateiname)}
 									<svg class="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
 										<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
 									</svg>
@@ -72,7 +83,7 @@
 										<path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
 									</svg>
 								{/if}
-								<span class="text-blue-600 hover:underline">{beleg}</span>
+								<span class="text-blue-600 hover:underline">{beleg.dateiname}</span>
 							</a>
 						{/each}
 					</div>
@@ -83,7 +94,7 @@
 
 	{#if data.eintraege.length > 0}
 		<div class="text-sm text-gray-500 text-right">
-			{data.eintraege.length} Buchungen mit {totalBelege} Belegen
+			{data.eintraege.length} {data.eintraege.length === 1 ? 'Eintrag' : 'Einträge'} mit {totalBelege} {totalBelege === 1 ? 'Beleg' : 'Belegen'}
 		</div>
 	{/if}
 </div>

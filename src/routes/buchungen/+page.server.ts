@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { leseProjekt, leseBuchungen } from '$lib/dataStore';
+import { leseProjekt, leseBuchungen, leseLieferanten } from '$lib/dataStore';
 
 export const load: PageServerLoad = ({ url }) => {
 	const projekt = leseProjekt();
@@ -13,6 +13,8 @@ export const load: PageServerLoad = ({ url }) => {
 	const suche = url.searchParams.get('suche')?.trim() || null;
 	const monat = url.searchParams.get('monat'); // "YYYY-MM" vom Verlauf-Link
 	const herkunft = url.searchParams.get('herkunft'); // 'direkt' | 'rechnung' | null
+	const lieferantFilter = url.searchParams.get('lieferant'); // Lieferant-ID
+	const lieferungFilter = url.searchParams.get('lieferung'); // Lieferung-ID
 
 	if (gewerk) buchungen = buchungen.filter((b) => b.gewerk === gewerk);
 	if (raum) buchungen = buchungen.filter((b) => b.raum === raum);
@@ -29,6 +31,15 @@ export const load: PageServerLoad = ({ url }) => {
 	if (monat) buchungen = buchungen.filter((b) => b.datum.startsWith(monat));
 	if (herkunft === 'direkt') buchungen = buchungen.filter((b) => !b.rechnungId);
 	if (herkunft === 'rechnung') buchungen = buchungen.filter((b) => !!b.rechnungId);
+	if (herkunft === 'lieferung') buchungen = buchungen.filter((b) => !!b.lieferungId);
+	if (lieferungFilter) {
+		buchungen = buchungen.filter((b) => b.lieferungId === lieferungFilter);
+	} else if (lieferantFilter) {
+		// Alle Lieferungs-IDs des Lieferanten ermitteln
+		const { lieferungen } = leseLieferanten();
+		const ids = new Set(lieferungen.filter((lu) => lu.lieferantId === lieferantFilter).map((lu) => lu.id));
+		buchungen = buchungen.filter((b) => b.lieferungId && ids.has(b.lieferungId));
+	}
 	if (suche) {
 		const q = suche.toLowerCase();
 		buchungen = buchungen.filter(
@@ -41,10 +52,14 @@ export const load: PageServerLoad = ({ url }) => {
 	// Sort by date descending
 	buchungen.sort((a, b) => b.datum.localeCompare(a.datum) || b.erstellt.localeCompare(a.erstellt));
 
+	const { lieferanten, lieferungen } = leseLieferanten();
+
 	return {
 		buchungen,
 		gewerke: projekt.gewerke,
 		raeume: projekt.raeume,
-		filter: { gewerk, raum, geschoss, kategorie, suche, herkunft }
+		lieferanten,
+		lieferungen,
+		filter: { gewerk, raum, geschoss, kategorie, suche, herkunft, lieferant: lieferantFilter, lieferung: lieferungFilter }
 	};
 };

@@ -29,7 +29,8 @@ export interface Buchung {
 	beschreibung: string;
 	rechnungsreferenz: string;
 	taetigkeit?: string;
-	rechnungId?: string;  // gesetzt wenn auto-erstellt aus bezahltem Abschlag
+	rechnungId?: string;   // gesetzt wenn auto-erstellt aus bezahltem Abschlag
+	lieferungId?: string;  // optionaler Link zu einer Lieferung
 	belege: string[];
 	erstellt: string;
 	geaendert: string;
@@ -41,21 +42,48 @@ export interface Budget {
 	notiz: string;
 }
 
-export type PlanungStatus = 'geplant' | 'aktiv' | 'fertig';
-
-export interface PlanungEintrag {
-	gewerk: string;       // Gewerk-ID
-	start: string;        // YYYY-MM-DD, leer wenn nicht terminiert
-	ende: string;         // YYYY-MM-DD, leer wenn nicht terminiert
-	status: PlanungStatus;
-	nachGewerk: string[]; // Gewerk-IDs die direkt nach diesem kommen
-}
-
 export interface ProjektData {
 	gewerke: Gewerk[];
 	raeume: Raum[];
 	budgets: Budget[];
-	planung: PlanungEintrag[];
+}
+
+// === Lieferanten & Lieferungen ===
+
+export interface LieferungPosition {
+	beschreibung: string;
+	menge?: string;    // z.B. "20 Stk", "5,5 m²"
+	betrag?: number;   // Cents
+}
+
+export interface Lieferant {
+	id: string;      // slugified, z.B. "hornbach", "bauhaus"
+	name: string;
+	notiz?: string;  // Kundennummer, Ansprechpartner etc.
+	erstellt: string;
+	geaendert: string;
+}
+
+export interface Lieferung {
+	id: string;
+	lieferantId: string;           // → Lieferant.id
+	datum: string;                 // "YYYY-MM-DD"
+	beschreibung?: string;
+	rechnungsnummer?: string;      // Rechnungsnummer des Lieferanten
+	lieferscheinnummer?: string;   // Lieferscheinnummer
+	betrag?: number;               // Rechnungsbetrag des Lieferanten in Cents (zur Gegenkontrolle)
+	gewerk?: string;               // optionale Gewerk-Zuordnung
+	positionen?: LieferungPosition[]; // aus PDF extrahierte Einzelpositionen
+	belege: string[];              // Lieferscheine, Händlerrechnungen etc.
+	notiz?: string;
+	buchungId?: string;            // Link zur auto-erstellten Buchung in buchungen.json
+	erstellt: string;
+	geaendert: string;
+}
+
+export interface LieferantenData {
+	lieferanten: Lieferant[];
+	lieferungen: Lieferung[];
 }
 
 // === Rechnungen & Abschläge ===
@@ -196,6 +224,30 @@ export function createAbschlag(
 	};
 }
 
+export function createLieferant(name: string, notiz?: string): Lieferant {
+	const now = new Date().toISOString();
+	return {
+		id: slugify(name),
+		name,
+		notiz,
+		erstellt: now,
+		geaendert: now
+	};
+}
+
+export function createLieferung(
+	data: Omit<Lieferung, 'id' | 'belege' | 'erstellt' | 'geaendert'>
+): Lieferung {
+	const now = new Date().toISOString();
+	return {
+		...data,
+		id: crypto.randomUUID(),
+		belege: [],
+		erstellt: now,
+		geaendert: now
+	};
+}
+
 /** Berechnet den effektiven Status eines Abschlags (ueberfaellig wenn offen + Fälligkeit überschritten) */
 export function abschlagEffektivStatus(abschlag: Abschlag): AbschlagStatus {
 	if (abschlag.status === 'offen' && abschlag.faelligkeitsdatum) {
@@ -309,12 +361,6 @@ export function berechneDashboard(
 		raumSummaries,
 		letzteBuchungen: [...buchungen].sort((a, b) => b.erstellt.localeCompare(a.erstellt)).slice(0, 10)
 	};
-}
-
-// === Planungs-Helpers ===
-
-export function vorgaengerVon(gewerkId: string, planung: PlanungEintrag[]): string[] {
-	return planung.filter((p) => p.nachGewerk.includes(gewerkId)).map((p) => p.gewerk);
 }
 
 // === Ort-Helpers ===

@@ -4,17 +4,16 @@ Web-App zur Kostenverfolgung von Renovierungsprojekten. Lokale SvelteKit-Anwendu
 
 ## Features
 
-- **Dashboard** – KPI-Karten (Budget, Ausgaben, Verbleibend, Burn Rate, Offene Rechnungen), 4 klickbare Charts, Budget-Warnungen, Gewerke-Übersicht
-- **Ausgaben** – Kostenbuchungen erfassen, bearbeiten, löschen; Volltext-Suche + kombinierbare Filter inkl. Herkunft (direkt / aus Rechnung); **Rückbuchungen**; optionales **Tätigkeit**-Feld
-- **Rechnungen** – Auftragnehmer-Rechnungen mit mehreren Abschlagszahlungen (Abschlag / Schlussrechnung / Nachtrag); Beleg-Upload je Abschlag; Bezahlen erstellt automatisch eine Buchung
-- **Nachträge** – Genehmigte Mehraufwände (Change Orders) auf Rechnungen erfassen; Gesamtauftrag = Auftragssumme + Σ Nachträge; Fortschrittsbalken berücksichtigt Nachträge
+- **Dashboard** – KPI-Karten (Budget, Ausgaben, Verbleibend, Burn Rate, **Ausstehend** = gestellte unbezahlte Abschläge, **Gebunden** = nicht fakturierte Vertragssummen), 4 klickbare Charts, Budget-Warnungen, vollständige Gewerke-Übersicht; **Monatsverlauf** (Balken-Chart, Linien-Chart, Tabelle) direkt integriert
+- **Ausgaben** – Kostenbuchungen erfassen, bearbeiten, löschen; Volltext-Suche + kombinierbare Filter inkl. Herkunft (direkt / aus Rechnung / aus Lieferung); **Rückbuchungen**; optionales **Tätigkeit**-Feld
+- **Aufträge** – Auftragnehmer-Rechnungen mit mehreren Abschlagszahlungen (Abschlag / Schlussrechnung / Nachtrag); Beleg-Upload je Abschlag; Bezahlen erstellt automatisch eine Buchung
+- **Nachträge** – Genehmigte Mehraufwände (Change Orders) auf Aufträgen erfassen; Gesamtauftrag = Auftragssumme + Σ Nachträge; Fortschrittsbalken berücksichtigt Nachträge
+- **Lieferanten** – Materialeinkäufe bei Händlern (Hornbach, Bauhaus etc.) erfassen; Lieferungen mit Belegen und Positionen; **Gutschriften** (negativer Betrag, rot markiert); **automatische PDF-Extraktion** (Datum, Betrag, Rg.-Nr., Positionen); Lieferungen fließen automatisch als Buchung in Ausgaben/Dashboard ein
 - **Flexible Ortzuordnung** – Buchungen auf einzelne Räume oder ganze Stockwerke buchen
-- **Belege** – Dokumente (PDF/JPG/PNG) pro Buchung oder Abschlag hochladen und verwalten
-- **Monatsverlauf** – Ausgaben-Trend + kumulierter Verlauf; Kategorie-Aufschlüsselung (Material / Arbeitslohn / Sonstiges)
+- **Belege** – Alle Dokumente (PDF/JPG/PNG) zentral: pro Buchung, Abschlag oder Lieferung; Typ-Badge zeigt Herkunft
 - **Prognose** – Burn-Rate-Projektion, Budget-Erschöpfungsdatum, **Gebundene Mittel** (offene Rechnungen), Gewerk-Hochrechnungstabelle
 - **Budget** – Gewerk-Budgets mit Ampel-Status und Inline-Bearbeitung; **Sammelgewerke** mit Tätigkeit-Aufschlüsselung
 - **Sammelgewerk** – Gewerke (z.B. Generalunternehmer) als "Sammelgewerk" markieren: kein Budget-Alarm, stattdessen Tätigkeit-Aufschlüsselung
-- **Bauplaner** – Zeitplan pro Gewerk (Gantt-Chart), Abhängigkeiten, Status-Tracking
 - **Gewerke & Räume** – Stammdaten verwalten (CRUD), Räume nach Geschoss gruppiert
 - **Export / Import** – Vollständiges ZIP-Backup aller Daten inkl. Belege und Rechnungen; Restore per Import
 - **Icons & visuelles Design** – Heroicons (Inline-SVG) auf allen Seiten; sticky Navigation; konsistente Card- und Tabellen-Styles
@@ -43,7 +42,7 @@ Datendateien anlegen:
 
 ```bash
 mkdir -p data/belege
-echo '{"gewerke":[],"raeume":[],"budgets":[],"planung":[]}' > data/projekt.json
+echo '{"gewerke":[],"raeume":[],"budgets":[]}' > data/projekt.json
 echo '[]' > data/buchungen.json
 echo '{"generiert":null,"gesamt":{"ist":0,"budget":0},"gewerke":[],"raeume":[],"letzteBuchungen":[]}' > data/summary.json
 ```
@@ -72,12 +71,14 @@ Alle Daten liegen in `data/` (nicht im Repository):
 
 | Datei | Inhalt |
 |-------|--------|
-| `projekt.json` | Gewerke, Räume, Budgets, Bauplaner-Einträge |
-| `buchungen.json` | Alle Kostenbuchungen (inkl. auto-erstellter aus Rechnungen) |
+| `projekt.json` | Gewerke, Räume, Budgets |
+| `buchungen.json` | Alle Kostenbuchungen (inkl. auto-erstellter aus Rechnungen und Lieferungen) |
 | `rechnungen.json` | Rechnungen mit Abschlägen und Nachträgen |
+| `lieferanten.json` | Lieferanten und Lieferungen |
 | `summary.json` | Auto-generierte Zusammenfassung |
 | `belege/` | Belege pro Buchung (`{buchung-id}/datei`) |
 | `rechnungen/` | Belege pro Abschlag (`{rechnung-id}/{abschlag-id}/datei`) |
+| `lieferungen/` | Belege pro Lieferung (`{lieferung-id}/datei`) |
 
 Geldbeträge werden als **Integer in Cent** gespeichert (`300000` = 3.000,00 €).
 Rückbuchungen werden als **negativer Betrag** gespeichert (`-5000` = −50,00 €).
@@ -95,6 +96,7 @@ Rückbuchungen werden als **negativer Betrag** gespeichert (`-5000` = −50,00 �
 | `rechnungsreferenz` | `string` | Optional, Rechnungsnummer |
 | `taetigkeit` | `string?` | Optional, z.B. `"Fliesen Bad"` – für Sammelgewerke |
 | `rechnungId` | `string?` | Gesetzt wenn auto-erstellt aus bezahltem Abschlag |
+| `lieferungId` | `string?` | Gesetzt wenn auto-erstellt aus einer Lieferung |
 | `belege` | `string[]` | Dateinamen hochgeladener Dokumente |
 
 ### Felder Rechnung / Abschlag / Nachtrag
@@ -123,6 +125,33 @@ Rückbuchungen werden als **negativer Betrag** gespeichert (`-5000` = −50,00 �
 | `beleg` | `string?` | Dateiname in `data/rechnungen/{rechnungId}/{abschlagId}/` |
 
 **Nachtrag** (Change Order):
+
+### Felder Lieferant / Lieferung
+
+**Lieferant:**
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | `string` | Slugified Name, z.B. `"hornbach"` |
+| `name` | `string` | Anzeigename |
+| `notiz` | `string?` | Kundennummer, Ansprechpartner etc. |
+
+**Lieferung:**
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | `string` | UUID v4 |
+| `lieferantId` | `string` | → Lieferant.id |
+| `datum` | `string` | `YYYY-MM-DD` |
+| `betrag` | `number?` | Cents – Rechnungsbetrag laut Händlerrechnung; **negativ bei Gutschriften** |
+| `gewerk` | `string?` | Gewerk-ID für auto-Buchung |
+| `rechnungsnummer` | `string?` | Rechnungsnummer des Lieferanten |
+| `lieferscheinnummer` | `string?` | Lieferscheinnummer |
+| `positionen` | `LieferungPosition[]?` | Aus PDF extrahierte Einzelpositionen |
+| `belege` | `string[]` | Dateinamen in `data/lieferungen/{lieferung-id}/` |
+| `buchungId` | `string?` | Link zur auto-erstellten Buchung (wird gesetzt wenn betrag + gewerk vorhanden) |
+
+**Auto-Buchung aus Lieferung:** Sobald `betrag` und `gewerk` an einer Lieferung gesetzt sind, wird automatisch eine Buchung mit `kategorie = "Material"` in `buchungen.json` angelegt. Diese erscheint in Ausgaben und fließt ins Dashboard ein. Beim Bearbeiten wird die Buchung synchronisiert; beim Löschen der Lieferung wird die auto-Buchung mitgelöscht.
 
 | Feld | Typ | Beschreibung |
 |------|-----|-------------|
@@ -171,16 +200,17 @@ src/
 └── routes/
     ├── +page.svelte          # Dashboard
     ├── buchungen/            # Ausgaben (Liste, Neu, Bearbeiten)
-    ├── rechnungen/           # Rechnungen mit Abschlägen und Nachträgen
-    ├── verlauf/              # Monatsverlauf
+    ├── rechnungen/           # Aufträge mit Abschlägen und Nachträgen
+    ├── lieferanten/          # Lieferanten-Übersicht und Detailseite mit Lieferungen
+    ├── lieferungen/          # Beleg-Auslieferung für Lieferungen
+    ├── verlauf/              # Monatsverlauf (URL erreichbar, im Dashboard integriert)
     ├── prognose/             # Prognose (Burn Rate, Budget-Erschöpfung, Hochrechnung)
     ├── belege/               # Dokumentenverwaltung
     ├── budget/               # Budget-Übersicht + Sammelgewerk-Aufschlüsselung
     ├── gewerke/              # Gewerke-Verwaltung (inkl. Sammelgewerk-Flag)
     ├── raeume/               # Räume-Verwaltung
-    ├── planung/              # Bauplaner (Gantt, Abhängigkeiten)
     ├── einstellungen/        # Export / Import
-    └── api/export/           # ZIP-Download-Endpoint
+    └── api/                  # PDF-Analyse-Endpoint, ZIP-Download-Endpoint
 ```
 
 ## NPM Scripts
