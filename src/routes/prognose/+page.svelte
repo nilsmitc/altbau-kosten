@@ -168,7 +168,7 @@
 				<div class="text-xs text-gray-400 mt-1">von {formatCents(data.gesamtBudget)} gesamt</div>
 				{#if data.gebundeneMittelGesamt > 0}
 					{@const nachBindung = data.restBudget - data.gebundeneMittelGesamt}
-					<div class="text-xs mt-1 {nachBindung < 0 ? 'text-red-500 font-medium' : 'text-gray-400'}">Nach Bindung: {formatCents(nachBindung)}</div>
+					<div class="text-xs mt-1 {nachBindung < 0 ? 'text-red-500 font-medium' : 'text-gray-400'}">Davon frei disponibel: {formatCents(nachBindung)}</div>
 				{/if}
 			</div>
 
@@ -178,10 +178,10 @@
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
 						</svg>
-						Gebundene Mittel
+						Ausstehende Zahlungen
 					</div>
 					<div class="text-xl font-bold font-mono mt-1 text-orange-600">{formatCents(data.gebundeneMittelGesamt)}</div>
-					<a href="/rechnungen" class="text-xs text-orange-500 hover:underline mt-1 block">Offene Rechnungen ansehen</a>
+					<a href="/rechnungen" class="text-xs text-orange-500 hover:underline mt-1 block">Rechnungen ansehen</a>
 				</div>
 			{/if}
 
@@ -210,29 +210,27 @@
 		<div class="card overflow-x-auto">
 			<div class="px-4 py-3 border-b bg-gray-50/80 rounded-t-lg">
 				<h2 class="text-sm font-semibold text-gray-700">Prognose nach Gewerk</h2>
-				<p class="text-xs text-gray-400 mt-0.5">Hochrechnung basiert auf dem bisherigen Kostenanteil jedes Gewerks am Gesamtprojekt.</p>
+				<p class="text-xs text-gray-400 mt-0.5">Ausstehend = offene Rechnungen + vertraglich vereinbarte, noch nicht fakturierte Beträge. Erwartet = Gesamtkosten laut Auftrag oder Schätzung (~) auf Basis bisheriger Ausgaben.</p>
 			</div>
 			<table class="w-full">
 				<thead>
 					<tr class="thead-row">
 						<th class="px-4 py-3 text-left">Gewerk</th>
 						<th class="px-4 py-3 text-right">Budget</th>
-						<th class="px-4 py-3 text-right">Ist</th>
-						<th class="px-4 py-3 text-right">Gebunden</th>
-						<th class="px-4 py-3 text-right">% verbraucht</th>
-						<th class="px-4 py-3 text-right">Hochrechnung</th>
-						<th class="px-4 py-3 text-right">Differenz</th>
+						<th class="px-4 py-3 text-right">Ausgaben</th>
+						<th class="px-4 py-3 text-right">Ausstehend</th>
+						<th class="px-4 py-3 text-right">Erwartet gesamt</th>
+						<th class="px-4 py-3 text-right">Freies Budget</th>
 						<th class="px-4 py-3 text-center">Status</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each data.gewerkPrognosen as p (p.gewerk.id)}
-						{@const pct = p.budget > 0 ? Math.round((p.ist / p.budget) * 100) : 0}
-						<tr class="border-b last:border-b-0 hover:bg-gray-50/50 transition-colors {p.ist === 0 ? 'opacity-50' : ''}">
+						<tr class="border-b last:border-b-0 hover:bg-gray-50/50 transition-colors {p.ist === 0 && p.gebunden === 0 ? 'opacity-50' : ''}">
 							<td class="px-4 py-3 text-sm">
 								<div class="flex items-center gap-2">
 									<div class="w-3 h-3 rounded-full shrink-0" style="background-color: {p.gewerk.farbe}"></div>
-									<span class="{p.ist === 0 ? 'italic text-gray-400' : 'font-medium'}">{p.gewerk.name}</span>
+									<span class="{p.ist === 0 && p.gebunden === 0 ? 'italic text-gray-400' : 'font-medium'}">{p.gewerk.name}</span>
 								</div>
 							</td>
 							<td class="px-4 py-3 text-sm text-right font-mono tabular-nums text-gray-500">
@@ -243,13 +241,6 @@
 							</td>
 							<td class="px-4 py-3 text-sm text-right font-mono tabular-nums {p.gebunden > 0 ? 'text-orange-600 font-medium' : 'text-gray-300'}">
 								{p.gebunden > 0 ? formatCents(p.gebunden) : '—'}
-							</td>
-							<td class="px-4 py-3 text-sm text-right">
-								{#if p.ist > 0 && p.budget > 0}
-									<span class="{pct > 100 ? 'text-red-600 font-medium' : pct >= 80 ? 'text-yellow-600 font-medium' : 'text-gray-600'}">{pct}%</span>
-								{:else}
-									<span class="text-gray-300">—</span>
-								{/if}
 							</td>
 							<td class="px-4 py-3 text-sm text-right font-mono tabular-nums">
 								{#if p.hochgerechnet !== null}
