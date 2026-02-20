@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { unzipSync } from 'fflate';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { schreibeBuchungen, schreibeProjekt } from '$lib/dataStore';
+import { schreibeBuchungen, schreibeProjekt, schreibeRechnungen, schreibeLieferanten } from '$lib/dataStore';
 import { fail, redirect } from '@sveltejs/kit';
 
 const DATA_DIR = join(process.cwd(), 'data');
@@ -58,15 +58,15 @@ export const actions: Actions = {
 			return fail(400, { error: 'buchungen.json muss ein Array sein' });
 		}
 
-		// Alten Beleg-Ordner löschen
-		const belegeDir = join(DATA_DIR, 'belege');
-		if (existsSync(belegeDir)) {
-			rmSync(belegeDir, { recursive: true });
+		// Alte Beleg-Ordner löschen
+		for (const ordner of ['belege', 'rechnungen', 'lieferungen']) {
+			const dir = join(DATA_DIR, ordner);
+			if (existsSync(dir)) rmSync(dir, { recursive: true });
 		}
 
-		// Belege aus ZIP extrahieren
+		// Belege aus ZIP extrahieren (alle 3 Quellen)
 		for (const [pfad, inhalt] of Object.entries(eintraege)) {
-			if (!pfad.startsWith('belege/')) continue;
+			if (!pfad.startsWith('belege/') && !pfad.startsWith('rechnungen/') && !pfad.startsWith('lieferungen/')) continue;
 			// Pfad-Traversal-Schutz: nur erlaubte Zeichen
 			if (/\.\./.test(pfad)) continue;
 			const ziel = join(DATA_DIR, pfad);
@@ -77,6 +77,24 @@ export const actions: Actions = {
 		// JSONs schreiben (triggert automatisch aktualisiereSummary())
 		schreibeProjekt(projektJson as Parameters<typeof schreibeProjekt>[0]);
 		schreibeBuchungen(buchungenJson as Parameters<typeof schreibeBuchungen>[0]);
+
+		// Rechnungen (optional – ältere Backups ohne diese Datei bleiben gültig)
+		if (eintraege['rechnungen.json']) {
+			try {
+				const rechnungenJson = JSON.parse(decoder.decode(eintraege['rechnungen.json']));
+				if (Array.isArray(rechnungenJson)) schreibeRechnungen(rechnungenJson);
+			} catch { /* beschädigter Eintrag – ignorieren */ }
+		}
+
+		// Lieferanten (optional – ältere Backups ohne diese Datei bleiben gültig)
+		if (eintraege['lieferanten.json']) {
+			try {
+				const lieferantenJson = JSON.parse(decoder.decode(eintraege['lieferanten.json']));
+				if (lieferantenJson && typeof lieferantenJson === 'object') {
+					schreibeLieferanten(lieferantenJson as Parameters<typeof schreibeLieferanten>[0]);
+				}
+			} catch { /* beschädigter Eintrag – ignorieren */ }
+		}
 
 		throw redirect(303, '/einstellungen?success=1');
 	}

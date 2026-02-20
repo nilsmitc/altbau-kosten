@@ -33,6 +33,12 @@ export const GET: RequestHandler = () => {
 		files['rechnungen.json'] = readFileSync(rechnungenJson);
 	}
 
+	// Lieferanten JSON
+	const lieferantenJson = join(DATA_DIR, 'lieferanten.json');
+	if (existsSync(lieferantenJson)) {
+		files['lieferanten.json'] = readFileSync(lieferantenJson);
+	}
+
 	// Rechnungs-Belege rekursiv (data/rechnungen/{rechnungId}/{abschlagId}/{datei})
 	const rechnungenBelegeDir = join(DATA_DIR, 'rechnungen');
 	if (existsSync(rechnungenBelegeDir)) {
@@ -58,10 +64,25 @@ export const GET: RequestHandler = () => {
 		}
 	}
 
+	// Lieferungs-Belege rekursiv (data/lieferungen/{lieferungId}/{datei})
+	const lieferungenBelegeDir = join(DATA_DIR, 'lieferungen');
+	if (existsSync(lieferungenBelegeDir)) {
+		for (const lieferungId of readdirSync(lieferungenBelegeDir)) {
+			const lieferungDir = join(lieferungenBelegeDir, lieferungId);
+			try {
+				for (const datei of readdirSync(lieferungDir)) {
+					files[`lieferungen/${lieferungId}/${datei}`] = readFileSync(join(lieferungDir, datei));
+				}
+			} catch {
+				// Einzelne defekte Ordner überspringen
+			}
+		}
+	}
+
 	const zip = zipSync(files, { level: 0 }); // level 0 = store only (PDFs/Bilder sind schon komprimiert)
 
 	const datum = new Date().toISOString().slice(0, 10);
-	const dateiname = `altbau-backup-${datum}.zip`;
+	const dateiname = `renovapp-backup-${datum}.zip`;
 
 	return new Response(zip.buffer as ArrayBuffer, {
 		headers: {
