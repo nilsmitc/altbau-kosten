@@ -21,6 +21,7 @@ Alle Daten liegen in `/home/nils/Altbau/data/`:
 | `buchungen.json` | Alle Kostenbuchungen (wächst) | Nur bei Detail-/Filterfragen |
 | `rechnungen.json` | Rechnungen mit Abschlägen und Nachträgen | Bei Rechnungsfragen |
 | `lieferanten.json` | Lieferanten + Lieferungen (Händlerrechnungen) | Bei Lieferanten-/Materialfragen |
+| `ai-analyse.json` | KI-Analyse für PDF-Bericht (von Claude Code geschrieben) | Bei "erstelle Analyse" / Bericht-Fragen |
 
 **Wichtig:** `summary.json` wird automatisch bei jedem Schreibvorgang neu generiert (von der Webapp und manuell). Sie enthält Summen pro Gewerk, Gesamt-Ist/Budget, die letzten 5 Buchungen und offene Abschläge.
 
@@ -293,6 +294,7 @@ Altbau/
 │   ├── buchungen.json              # Alle Buchungen (inkl. auto-erstellter)
 │   ├── rechnungen.json             # Rechnungen mit Abschlägen und Nachträgen
 │   ├── lieferanten.json            # Lieferanten + Lieferungen
+│   ├── ai-analyse.json            # KI-Analyse (von Claude Code geschrieben)
 │   ├── belege/                     # Beleg-Dateien pro Buchung
 │   ├── rechnungen/                 # Belege pro Abschlag ({rechnungId}/{abschlagId}/)
 │   ├── lieferungen/                # Belege pro Lieferung ({lieferungId}/)
@@ -305,7 +307,7 @@ Altbau/
 │   │   ├── pdfExtract.ts           # PDF-Textextraktion via pdf-parse v2 (für Lieferungen)
 │   │   ├── pdfReport.ts            # PDF-Berichtserstellung (pdfmake, A4, 9 Abschnitte)
 │   │   ├── pdfCharts.ts            # Server-side Chart-Rendering (chartjs-node-canvas → base64 PNG)
-│   │   ├── aiAnalyse.ts            # Claude CLI Integration (claude -p Subprozess)
+│   │   ├── aiAnalyse.ts            # KI-Analyse lesen (leseAnalyse() → data/ai-analyse.json)
 │   │   └── components/
 │   │       ├── BuchungForm.svelte   # Wiederverwendbares Buchungs-Formular
 │   │       ├── Charts.svelte        # Doughnut + Bar Chart (Chart.js)
@@ -376,33 +378,90 @@ Professioneller PDF-Bericht für den Bauleiter mit allen Finanzdaten, Charts und
 **Technische Umsetzung:**
 - `pdfmake` 0.3.x: deklaratives JSON → PDF (A4 Portrait, Roboto-Schrift aus vfs_fonts als base64-Buffer)
 - `chartjs-node-canvas`: Chart.js server-side → base64 PNG (800×400px, `animation: false`)
-- `claude -p`: Claude CLI als Child-Process (`execFile`) für KI-Analyse (60s Timeout, Fallback auf `null`)
-- API: `GET /api/bericht` (ohne KI) / `GET /api/bericht?ai=true` (mit KI, ~15s länger)
+- KI-Analyse: datei-basiert via `data/ai-analyse.json` (von Claude Code geschrieben, von der Webapp gelesen)
+- API: `GET /api/bericht` (ohne KI) / `GET /api/bericht?ai=true` (mit KI aus Datei)
 
-**PDF-Inhalt (7–9 Seiten):**
+**PDF-Inhalt (8–10 Seiten):**
 1. **Deckblatt** — Kernzahlen (Budget, Ausgaben, Verbleibend, %), Fortschrittsbalken
 2. **KI-Einschätzung** (nur mit `?ai=true`) — Zusammenfassung, Risikobewertung, Cashflow, Empfehlungen
-3. **Budget-Übersicht** — Doughnut + Bar Chart, Gewerk-Tabelle mit Ampel-Farben
+3. **Budget-Übersicht** — Doughnut + Bar Chart (volle Breite), Gewerk-Tabelle mit Ampel-Farben
 4. **Kategorien-Analyse** — Doughnut (Material/Arbeitslohn/Sonstiges) + Stacked Bar nach Gewerk
 5. **Kosten nach Raum** — Tabelle gruppiert nach Geschoss
-6. **Auftragsstatus** — Tabelle mit offenen/überfälligen Rechnungen
-7. **Monatsverlauf** — Bar + Linienchart, Monatstabelle
+6. **Auftragsstatus** — Tabelle mit offenen/überfälligen Rechnungen, Status: Überfällig/Offen/Ausstehend/Teilw. bezahlt/Bezahlt
+7. **Monatsverlauf** — Bar + Linienchart (volle Breite), Monatstabelle
 8. **Prognose** — Burn Rate, Erschöpfungsdatum, Prognose-Linienchart, Gewerk-Hochrechnung
 9. **Lieferanten-Übersicht** — Tabelle mit Anzahl Lieferungen und Gesamtbeträgen
 
-**Neue Dateien:**
+**Dateien:**
 - `src/lib/pdfReport.ts` — PDF-Dokumentaufbau (pdfmake docDefinition, 9 Abschnitte)
 - `src/lib/pdfCharts.ts` — 7 Chart-Render-Funktionen (portiert aus Charts.svelte/VerlaufSection.svelte)
-- `src/lib/aiAnalyse.ts` — `analysiereBaudaten()`, `isClaudeVerfuegbar()`, `BauAnalyse`-Interface
-- `src/routes/api/bericht/+server.ts` — GET-Endpoint, baut Datentext für Claude, liefert PDF
+- `src/lib/aiAnalyse.ts` — `leseAnalyse()`, `BauAnalyse`-Interface, `BauAnalyseDatei`-Interface
+- `src/routes/api/bericht/+server.ts` — GET-Endpoint, liest Analyse-Datei, liefert PDF
 - `src/routes/bericht/+page.svelte` — UI mit Projektinfo, KI-Checkbox, Download-Button
-- `src/routes/bericht/+page.server.ts` — Prüft Claude CLI, lädt Summary-Daten
+- `src/routes/bericht/+page.server.ts` — Prüft ob Analyse-Datei existiert, lädt Summary-Daten
 
 **Hinweise zu pdfmake 0.3.x:**
 - Import: `import PdfPrinter from 'pdfmake/js/Printer'` (nicht aus Haupt-Entry)
 - Konstruktor: `new PdfPrinter.default(fonts)` (nicht `new PdfPrinter(fonts)`)
 - Fonts: `Buffer.from(vfsFonts['Roboto-Regular.ttf'], 'base64')` (nicht Dateipfade)
 - `createPdfKitDocument()` ist async (returns Promise) — `await` nötig
+
+---
+
+## Claude Code: Bauleiter-Analyse erstellen
+
+Wenn der User sagt "erstelle Bauleiter-Analyse", "analysiere die Baudaten", "aktualisiere die KI-Analyse" oder ähnlich:
+
+### Schritt 1: Daten lesen
+```
+→ Read data/summary.json          ← Immer zuerst (Gesamtübersicht)
+→ Read data/rechnungen.json       ← Aufträge mit Abschlägen, offene Beträge
+→ Read data/buchungen.json        ← Detail-Buchungen für Zeitreihen, Kategorien
+→ Read data/lieferanten.json      ← Lieferanten und Materialkosten
+→ Read data/projekt.json          ← Gewerke, Räume, Budgets (Stammdaten)
+```
+
+### Schritt 2: Analysieren als erfahrener Bauleiter/Baukostenberater
+- Konkrete Zahlen und Eurobeträge nennen
+- Prozentsätze und Vergleiche (Budget vs. Ist)
+- Trends erkennen (Burn Rate, Monatsentwicklung)
+- Risiken identifizieren (Gewerke nahe/über Budget, große offene Aufträge)
+- Cashflow bewerten (offene Rechnungen, gebundene Mittel, Zahlungstermine)
+
+### Schritt 3: Datei schreiben
+```
+→ Write data/ai-analyse.json
+```
+
+**Exaktes JSON-Format** (die Webapp liest diese Struktur):
+```json
+{
+  "erstellt": "2026-02-21T18:30:00.000Z",
+  "analyse": {
+    "zusammenfassung": "3-5 Sätze zum aktuellen Projektstatus mit konkreten Zahlen. Budget, Ausgaben, Verbrauch in %, Burn Rate, wie viele Gewerke aktiv.",
+    "risikobewertung": "Welche Gewerke sind kritisch? Wo drohen Budgetüberschreitungen? Konkrete Zahlen und Prozente. Große unbezahlte Aufträge benennen.",
+    "cashflowBewertung": "Offene Rechnungen beziffern, gebundene Mittel, Zahlungstermine, Liquiditätsprognose. Burn Rate und Restbudget-Reichweite.",
+    "empfehlungen": [
+      "Erste konkrete Empfehlung mit Zahlen",
+      "Zweite konkrete Empfehlung",
+      "Dritte konkrete Empfehlung",
+      "Weitere falls nötig"
+    ]
+  }
+}
+```
+
+**Wichtig:**
+- `erstellt`: aktueller ISO-Timestamp (`new Date().toISOString()`)
+- `zusammenfassung`: Fließtext, 3-5 Sätze
+- `risikobewertung`: Fließtext, Gewerke mit % und €-Beträgen
+- `cashflowBewertung`: Fließtext, offene Beträge, Termine, Reichweite
+- `empfehlungen`: Array von Strings, jede Empfehlung ein eigener Eintrag, 3-6 Stück
+- Alle Felder sind Pflicht, alle müssen nicht-leere Strings/Arrays sein
+- Die Webapp zeigt diese Daten 1:1 im PDF an — Qualität zählt
+
+### Schritt 4: User informieren
+> "Analyse geschrieben. PDF unter `/bericht` herunterladen — die KI-Checkbox ist jetzt automatisch aktiv."
 
 ---
 
@@ -602,11 +661,12 @@ Neues optionales Feld `taetigkeit?: string` auf jeder Buchung. Im Buchungsformul
 - Inline-Bearbeitung bestehender Lieferungen
 
 ### Bauleiter-Bericht (`/bericht`)
-- Professioneller PDF-Bericht mit allen Finanzdaten und Charts
-- **KI-Analyse** (optional): Claude CLI analysiert Baudaten → Zusammenfassung, Risikobewertung, Cashflow-Einschätzung, Empfehlungen
+- Professioneller PDF-Bericht mit allen Finanzdaten und Charts (8–10 Seiten)
+- **KI-Analyse** (optional): Claude Code schreibt Analyse nach `data/ai-analyse.json`, Webapp liest sie ein
 - PDF enthält: Deckblatt, Budget-Übersicht, Kategorien, Kosten nach Raum, Auftragsstatus, Monatsverlauf, Prognose, Lieferanten
-- 7 server-side gerenderte Charts (portiert aus Dashboard-Charts)
-- Checkbox "Mit KI-Analyse" (nur wenn `claude` CLI verfügbar, geprüft via `which claude`)
+- 7 server-side gerenderte Charts (volle Breite, portiert aus Dashboard-Charts)
+- Checkbox "Mit KI-Analyse" (aktiv wenn `data/ai-analyse.json` existiert)
+- Anleitung: "erstelle Bauleiter-Analyse" in Claude Code → Datei wird geschrieben → PDF enthält Analyse
 - Download als `bauleiter-bericht-YYYY-MM-DD.pdf`
 
 ### Einstellungen (`/einstellungen`)

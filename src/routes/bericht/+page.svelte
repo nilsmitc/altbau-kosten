@@ -4,14 +4,13 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let mitAi = $state(data.claudeVerfuegbar);
+	let mitAi = $state(data.analyseVorhanden);
 	let laeuft = $state(false);
 
 	function berichtErstellen() {
 		laeuft = true;
 		const url = mitAi ? '/api/bericht?ai=true' : '/api/bericht';
 
-		// Fetch als Blob um Spinner-State zu ermöglichen
 		fetch(url)
 			.then((res) => {
 				if (!res.ok) throw new Error('Fehler beim Erstellen');
@@ -30,6 +29,11 @@
 			.finally(() => {
 				laeuft = false;
 			});
+	}
+
+	function formatZeit(iso: string): string {
+		const d = new Date(iso);
+		return `${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
 	}
 </script>
 
@@ -75,34 +79,26 @@
 				<input
 					type="checkbox"
 					bind:checked={mitAi}
-					disabled={!data.claudeVerfuegbar}
+					disabled={!data.analyseVorhanden}
 					class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 				/>
 				<div>
 					<div class="text-sm font-medium text-gray-900">
-						Mit KI-Analyse (Claude)
+						Mit KI-Analyse
 					</div>
-					{#if data.claudeVerfuegbar}
-						<div class="text-xs text-gray-500 mt-1">
-							Claude analysiert die Finanzdaten und erstellt eine Zusammenfassung mit Risikobewertung,
-							Cashflow-Einschätzung und konkreten Empfehlungen.
+					{#if data.analyseVorhanden && data.analyseErstellt}
+						<div class="text-xs text-green-600 mt-1">
+							Analyse vorhanden (erstellt am {formatZeit(data.analyseErstellt)}).
+							Enthält Zusammenfassung, Risikobewertung, Cashflow-Einschätzung und Empfehlungen.
 						</div>
 					{:else}
-						<div class="text-xs text-red-500 mt-1">
-							Claude CLI nicht verfügbar. Stelle sicher, dass <code class="bg-red-100 px-1 rounded">claude</code> installiert und im PATH ist.
+						<div class="text-xs text-gray-400 mt-1">
+							Keine KI-Analyse vorhanden. Erstelle eine in Claude Code:
+							<code class="bg-gray-100 px-1 rounded text-gray-600">erstelle Bauleiter-Analyse</code>
 						</div>
 					{/if}
 				</div>
 			</label>
-		</div>
-
-		<!-- Hinweis -->
-		<div class="text-xs text-gray-400">
-			{#if mitAi}
-				Die Erstellung dauert ca. 15–30 Sekunden (inkl. KI-Analyse).
-			{:else}
-				Die Erstellung dauert wenige Sekunden.
-			{/if}
 		</div>
 
 		<!-- Button -->
@@ -115,7 +111,7 @@
 				<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
 				</svg>
-				{mitAi ? 'Bericht wird erstellt (mit KI-Analyse)...' : 'Bericht wird erstellt...'}
+				Bericht wird erstellt...
 			{:else}
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />

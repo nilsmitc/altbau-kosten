@@ -73,7 +73,8 @@ export async function erstelleBauleiterbericht(
 	buchungen: Buchung[],
 	rechnungen: Rechnung[],
 	lieferantenData: LieferantenData,
-	aiAnalyse: BauAnalyse | null
+	aiAnalyse: BauAnalyse | null,
+	aiAngefragt: boolean = false
 ): Promise<Uint8Array> {
 	const gewerkSummaries = berechneGewerkSummaries(buchungen, projekt.gewerke, projekt.budgets);
 	const raumSummaries = berechneRaumSummaries(buchungen, projekt.raeume);
@@ -234,6 +235,15 @@ export async function erstelleBauleiterbericht(
 	}
 
 	// --- KI-Einschätzung ---
+	if (aiAngefragt && !aiAnalyse) {
+		content.push(
+			{ text: '', pageBreak: 'after' },
+			{ text: 'Zusammenfassung & Bewertung', style: 'h2', fontSize: 20 },
+			{ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#9CA3AF' }], margin: [0, 0, 0, 16] },
+			{ text: 'Die KI-Analyse konnte nicht erstellt werden.', fontSize: 11, color: '#6B7280', margin: [0, 0, 0, 8] },
+			{ text: 'Mögliche Ursachen: Claude CLI nicht verfügbar, Timeout oder Fehler bei der Verarbeitung. Bitte prüfe, ob "claude" installiert und im PATH ist.', fontSize: 9, color: '#9CA3AF' }
+		);
+	}
 	if (aiAnalyse) {
 		content.push(
 			{ text: '', pageBreak: 'after' },
@@ -287,20 +297,17 @@ export async function erstelleBauleiterbericht(
 		{ text: 'Budget-Übersicht', style: 'h2', fontSize: 20 }
 	);
 
-	if (chartKosten && chartBudgetVsIst) {
-		content.push({
-			columns: [
-				{ width: '*', stack: [
-					{ text: 'Kosten nach Gewerk', style: 'h3' },
-					{ image: chartKosten, width: 245 }
-				]},
-				{ width: '*', stack: [
-					{ text: 'Budget vs. Ausgaben', style: 'h3' },
-					{ image: chartBudgetVsIst, width: 245 }
-				]}
-			],
-			margin: [0, 0, 0, 16]
-		});
+	if (chartKosten) {
+		content.push(
+			{ text: 'Kosten nach Gewerk', style: 'h3' },
+			{ image: chartKosten, width: 500, margin: [0, 0, 0, 12] }
+		);
+	}
+	if (chartBudgetVsIst) {
+		content.push(
+			{ text: 'Budget vs. Ausgaben', style: 'h3' },
+			{ image: chartBudgetVsIst, width: 500, margin: [0, 0, 0, 12] }
+		);
 	}
 
 	// Budget-Tabelle
@@ -345,20 +352,17 @@ export async function erstelleBauleiterbericht(
 		{ text: 'Kategorien-Analyse', style: 'h2', fontSize: 20 }
 	);
 
-	if (chartKategorie && chartKatNachGewerk) {
-		content.push({
-			columns: [
-				{ width: '*', stack: [
-					{ text: 'Kostenverteilung', style: 'h3' },
-					{ image: chartKategorie, width: 245 }
-				]},
-				{ width: '*', stack: [
-					{ text: 'Kategorien nach Gewerk', style: 'h3' },
-					{ image: chartKatNachGewerk, width: 245 }
-				]}
-			],
-			margin: [0, 0, 0, 16]
-		});
+	if (chartKategorie) {
+		content.push(
+			{ text: 'Kostenverteilung', style: 'h3' },
+			{ image: chartKategorie, width: 500, margin: [0, 0, 0, 12] }
+		);
+	}
+	if (chartKatNachGewerk) {
+		content.push(
+			{ text: 'Kategorien nach Gewerk', style: 'h3' },
+			{ image: chartKatNachGewerk, width: 500, margin: [0, 0, 0, 12] }
+		);
 	}
 
 	// Kategorien-Tabelle
@@ -457,8 +461,18 @@ export async function erstelleBauleiterbericht(
 			summeOffen += offen;
 
 			const gewerkName = projekt.gewerke.find((g) => g.id === r.gewerk)?.name ?? r.gewerk;
-			const statusText = hatUeberfaellig ? 'Überfällig' : offen > 0 ? 'Offen' : bezahlt > 0 ? 'Bezahlt' : 'Ausstehend';
-			const statusFarbe = hatUeberfaellig ? '#EF4444' : offen > 0 ? '#F97316' : '#10B981';
+			const hatAusstehend = r.abschlaege.some((a) => abschlagEffektivStatus(a) === 'ausstehend');
+			const statusText = hatUeberfaellig ? 'Überfällig'
+				: offen > 0 ? 'Offen'
+				: hatAusstehend ? 'Ausstehend'
+				: (bezahlt > 0 && bezahlt < auftragGesamt) ? 'Teilw. bezahlt'
+				: bezahlt >= auftragGesamt && auftragGesamt > 0 ? 'Bezahlt'
+				: 'Ausstehend';
+			const statusFarbe = hatUeberfaellig ? '#EF4444'
+				: offen > 0 ? '#F97316'
+				: hatAusstehend ? '#6B7280'
+				: (bezahlt > 0 && bezahlt < auftragGesamt) ? '#3B82F6'
+				: '#10B981';
 
 			aufBody.push([
 				{ text: r.auftragnehmer, fontSize: 9, bold: true },
@@ -493,20 +507,17 @@ export async function erstelleBauleiterbericht(
 			{ text: 'Monatsverlauf', style: 'h2', fontSize: 20 }
 		);
 
-		if (chartMonat && chartKumuliert) {
-			content.push({
-				columns: [
-					{ width: '*', stack: [
-						{ text: 'Ausgaben pro Monat', style: 'h3' },
-						{ image: chartMonat, width: 245 }
-					]},
-					{ width: '*', stack: [
-						{ text: 'Kumulierte Gesamtausgaben', style: 'h3' },
-						{ image: chartKumuliert, width: 245 }
-					]}
-				],
-				margin: [0, 0, 0, 16]
-			});
+		if (chartMonat) {
+			content.push(
+				{ text: 'Ausgaben pro Monat', style: 'h3' },
+				{ image: chartMonat, width: 500, margin: [0, 0, 0, 12] }
+			);
+		}
+		if (chartKumuliert) {
+			content.push(
+				{ text: 'Kumulierte Gesamtausgaben', style: 'h3' },
+				{ image: chartKumuliert, width: 500, margin: [0, 0, 0, 12] }
+			);
 		}
 
 		const monBody: TableCell[][] = [
